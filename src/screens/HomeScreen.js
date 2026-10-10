@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   SafeAreaView,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getHandbags } from '../services/api';
+import HandbagCard from '../components/HandbagCard';
 
 const SAMPLE_BAGS = [
   {
@@ -67,75 +67,9 @@ const SAMPLE_BAGS = [
   },
 ];
 
-const CATEGORIES = ['All', 'Shoulder', 'Evening', 'Tote'];
-
-const formatPrice = (price) =>
-  `$${Number(price || 0).toLocaleString('en-US', {
-    maximumFractionDigits: 2,
-  })}`;
-
-function ProductCard({ item, wide, onOpen, isFavorite, onFavorite }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  return (
-    <Pressable
-      onPress={onOpen}
-      style={[
-        styles.productCard,
-        wide ? styles.wideCard : styles.squareCard,
-        { backgroundColor: item.color || '#D8D8D8' },
-      ]}
-    >
-      {!imageFailed && item.uri ? (
-        <Image
-          source={{ uri: item.uri }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <View style={styles.imageFallback}>
-          <Ionicons name="bag-outline" size={48} color="#FFFFFF" />
-        </View>
-      )}
-
-      {/* Nút túi / yêu thích: ô vuông bo góc, nền trắng mờ */}
-      <Pressable
-        onPress={(event) => {
-          event.stopPropagation?.();
-          onFavorite(item);
-        }}
-        style={styles.bagAction}
-        hitSlop={8}
-      >
-        <Ionicons
-          name={isFavorite ? 'heart' : 'bag-outline'}
-          size={16}
-          color={isFavorite ? '#B74B42' : '#FFFFFF'}
-        />
-      </Pressable>
-
-      {/* Mô tả bên phải – chỉ có ở thẻ rộng */}
-      {wide && (
-        <Text style={styles.wideDescriptionText}>
-          For everyday{'\n'}sophistication.
-        </Text>
-      )}
-
-      {/* Tên + giá nằm đè lên ảnh, góc dưới */}
-      <View style={styles.productCaption}>
-        <Text style={styles.productCaptionName} numberOfLines={1}>
-          {item.handbagName}
-        </Text>
-        <Text style={styles.productCaptionPrice}>{formatPrice(item.cost)}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 export default function HomeScreen({ navigation }) {
   const [handbags, setHandbags] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedBrand, setSelectedBrand] = useState('All');
   const [favoriteIds, setFavoriteIds] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -170,16 +104,28 @@ export default function HomeScreen({ navigation }) {
     };
   }, []);
 
-  // Giữ nguyên thứ tự dữ liệu (giống ảnh: Muse → Nomad → Soft Clutch)
+  // Danh sách brand lấy từ dữ liệu API: "All" + các brand không trùng, xếp A-Z
+  const brands = useMemo(() => {
+    const unique = new Set(
+      handbags
+        .map((item) => String(item.brand || '').trim())
+        .filter(Boolean)
+    );
+    return ['All', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
+  }, [handbags]);
+
+  // Lọc theo brand đang chọn, rồi sắp xếp giá giảm dần (theo đề bài)
   const filteredProducts = useMemo(() => {
-    return handbags.filter((item) => {
-      if (selectedCategory === 'All') return true;
-      return (
-        String(item.category || '').toLowerCase() ===
-        selectedCategory.toLowerCase()
-      );
-    });
-  }, [handbags, selectedCategory]);
+    const byBrand =
+      selectedBrand === 'All'
+        ? handbags
+        : handbags.filter(
+            (item) => String(item.brand || '').trim() === selectedBrand
+          );
+
+    // Copy mảng trước khi sort để không làm đổi state gốc
+    return [...byBrand].sort((a, b) => Number(b.cost) - Number(a.cost));
+  }, [handbags, selectedBrand]);
 
   const toggleFavorite = (item) => {
     setFavoriteIds((previous) =>
@@ -205,7 +151,7 @@ export default function HomeScreen({ navigation }) {
       rows.push(
         <View key={`row-${first.id}`} style={styles.productRow}>
           <View style={styles.productColumn}>
-            <ProductCard
+            <HandbagCard
               item={first}
               onOpen={() => openDetail(first)}
               onFavorite={toggleFavorite}
@@ -215,7 +161,7 @@ export default function HomeScreen({ navigation }) {
 
           <View style={styles.productColumn}>
             {second && (
-              <ProductCard
+              <HandbagCard
                 item={second}
                 onOpen={() => openDetail(second)}
                 onFavorite={toggleFavorite}
@@ -232,7 +178,7 @@ export default function HomeScreen({ navigation }) {
         const wideItem = filteredProducts[index];
 
         rows.push(
-          <ProductCard
+          <HandbagCard
             key={`wide-${wideItem.id}`}
             item={wideItem}
             wide
@@ -286,13 +232,13 @@ export default function HomeScreen({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryList}
         >
-          {CATEGORIES.map((category) => {
-            const active = selectedCategory === category;
+          {brands.map((brand) => {
+            const active = selectedBrand === brand;
 
             return (
               <Pressable
-                key={category}
-                onPress={() => setSelectedCategory(category)}
+                key={brand}
+                onPress={() => setSelectedBrand(brand)}
                 style={[styles.categoryChip, active && styles.activeChip]}
               >
                 <Text
@@ -301,7 +247,7 @@ export default function HomeScreen({ navigation }) {
                     active && styles.activeChipText,
                   ]}
                 >
-                  {category}
+                  {brand}
                 </Text>
               </Pressable>
             );
@@ -317,7 +263,7 @@ export default function HomeScreen({ navigation }) {
         ) : filteredProducts.length > 0 ? (
           <View style={styles.products}>{renderProductRows()}</View>
         ) : (
-          <Text style={styles.emptyText}>No handbags in this category.</Text>
+          <Text style={styles.emptyText}>No handbags for this brand.</Text>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -330,6 +276,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F1F1',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
+
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 110, // chừa chỗ cho tab bar nổi
@@ -342,6 +289,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+
   headerButton: {
     width: 32,
     height: 38,
@@ -354,6 +302,7 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     paddingBottom: 22,
   },
+
   heroTitle: {
     fontSize: 28,
     lineHeight: 34,
@@ -361,6 +310,7 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     fontWeight: '400',
   },
+
   heroBold: {
     fontSize: 28,
     lineHeight: 34,
@@ -375,6 +325,7 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     alignItems: 'center',
   },
+
   categoryChip: {
     minHeight: 32,
     paddingHorizontal: 16,
@@ -383,13 +334,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
+
   activeChip: {
     backgroundColor: '#050505',
   },
+
   categoryText: {
     fontSize: 13,
     color: '#55514C',
   },
+
   activeChipText: {
     color: '#FFFFFF',
     fontWeight: '600',
@@ -399,89 +353,21 @@ const styles = StyleSheet.create({
   products: {
     gap: 12,
   },
+
   productRow: {
     flexDirection: 'row',
     gap: 12,
   },
+
   productColumn: {
     flex: 1,
     minWidth: 0,
-  },
-  productCard: {
-    overflow: 'hidden',
-    borderRadius: 26,
-    position: 'relative',
-  },
-  squareCard: {
-    width: '100%',
-    aspectRatio: 0.74, // thẻ đứng giống ảnh
-  },
-  wideCard: {
-    width: '100%',
-    aspectRatio: 2.3, // thẻ ngang
-  },
-  imageFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Nút túi (ô vuông bo góc, mờ)
-  bagAction: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.28)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Tên + giá đè trên ảnh
-  productCaption: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  productCaptionName: {
-    flex: 1,
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginRight: 6,
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  productCaptionPrice: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-
-  // Mô tả trên thẻ rộng
-  wideDescriptionText: {
-    position: 'absolute',
-    right: 14,
-    bottom: 38,
-    color: '#1F1F1F',
-    fontSize: 12,
-    lineHeight: 17,
-    textAlign: 'right',
   },
 
   loader: {
     marginTop: 35,
   },
+
   emptyText: {
     textAlign: 'center',
     color: '#77716A',
