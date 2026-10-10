@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
+  FlatList,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -13,96 +14,68 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getHandbags } from '../services/api';
 import HandbagCard from '../components/HandbagCard';
+import useFavorites from '../hooks/useFavorites';
 
-const SAMPLE_BAGS = [
-  {
-    id: '1',
-    handbagName: 'The Muse',
-    brand: 'Bvlgari',
-    category: 'Shoulder',
-    cost: 180,
-    percentOff: 0.3,
-    color: '#7194B7',
-    uri: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=600',
-  },
-  {
-    id: '2',
-    handbagName: 'The Nomad',
-    brand: 'Fendi',
-    category: 'Evening',
-    cost: 220,
-    percentOff: 0.2,
-    color: '#77452D',
-    uri: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=600',
-  },
-  {
-    id: '3',
-    handbagName: 'Soft Clutch',
-    brand: 'Burberry',
-    category: 'Tote',
-    cost: 150,
-    percentOff: 0.15,
-    color: '#A8C5D0',
-    uri: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=900',
-  },
-  {
-    id: '4',
-    handbagName: 'Classic Mini',
-    brand: 'Ferragamo',
-    category: 'Shoulder',
-    cost: 260,
-    percentOff: 0.25,
-    color: '#D6B16C',
-    uri: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=600',
-  },
-  {
-    id: '5',
-    handbagName: 'Everyday Bag',
-    brand: 'Michael Kors',
-    category: 'Tote',
-    cost: 190,
-    percentOff: 0.1,
-    color: '#B7C9B5',
-    uri: 'https://images.unsplash.com/photo-1591561954557-26941169b49e?w=600',
-  },
-];
+// Khối thông báo lỗi / danh sách rỗng, có nút thử lại
+function StateMessage({ icon, title, message, actionLabel, onAction }) {
+  return (
+    <View style={styles.stateBox}>
+      <Ionicons name={icon} size={40} color="#77716A" />
+      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={styles.stateText}>{message}</Text>
+      <Pressable onPress={onAction} style={styles.retryButton}>
+        <Text style={styles.retryText}>{actionLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export default function HomeScreen({ navigation }) {
   const [handbags, setHandbags] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('All');
-  const [favoriteIds, setFavoriteIds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function loadProducts() {
-      try {
-        const data = await getHandbags();
-        if (mounted && Array.isArray(data) && data.length > 0) {
-          setHandbags(
-            data.map((item) => ({
-              ...item,
-              color: item.color || '#A8B9C8',
-              uri: item.uri || item.image || item.imageUrl || '',
-            }))
-          );
-        } else if (mounted) {
-          setHandbags(SAMPLE_BAGS);
-        }
-      } catch {
-        if (mounted) setHandbags(SAMPLE_BAGS);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    loadProducts();
-
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
+
+  // Tải danh sách túi từ MockAPI. Dùng lại được cho nút "Try again".
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await getHandbags();
+      if (!mountedRef.current) return;
+
+      if (!Array.isArray(data)) {
+        throw new Error('Unexpected response from the server.');
+      }
+
+      setHandbags(
+        data.map((item) => ({
+          ...item,
+          uri: item.uri || item.image || item.imageUrl || '',
+        }))
+      );
+    } catch {
+      if (mountedRef.current) {
+        setError('Could not load handbags. Check your connection and try again.');
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   // Danh sách brand lấy từ dữ liệu API: "All" + các brand không trùng, xếp A-Z
   const brands = useMemo(() => {
@@ -127,35 +100,64 @@ export default function HomeScreen({ navigation }) {
     return [...byBrand].sort((a, b) => Number(b.cost) - Number(a.cost));
   }, [handbags, selectedBrand]);
 
-  const toggleFavorite = (item) => {
-    setFavoriteIds((previous) =>
-      previous.includes(String(item.id))
-        ? previous.filter((id) => id !== String(item.id))
-        : [...previous, String(item.id)]
-    );
-  };
-
-  const openDetail = (item) => {
-    navigation.navigate('Detail', { handbag: item });
-  };
-
-  // Mẫu lặp: 2 thẻ vuông cạnh nhau → 1 thẻ rộng → lặp lại
-  const renderProductRows = () => {
-    const rows = [];
+  // Gom thành các hàng cho FlatList: 2 thẻ đứng -> 1 thẻ rộng -> lặp lại
+  const rows = useMemo(() => {
+    const result = [];
     let index = 0;
 
     while (index < filteredProducts.length) {
-      const first = filteredProducts[index];
-      const second = filteredProducts[index + 1];
+      result.push({
+        key: `pair-${filteredProducts[index].id}`,
+        type: 'pair',
+        items: filteredProducts.slice(index, index + 2),
+      });
+      index += 2;
 
-      rows.push(
-        <View key={`row-${first.id}`} style={styles.productRow}>
+      if (index < filteredProducts.length) {
+        result.push({
+          key: `wide-${filteredProducts[index].id}`,
+          type: 'wide',
+          item: filteredProducts[index],
+        });
+        index += 1;
+      }
+    }
+
+    return result;
+  }, [filteredProducts]);
+
+  // Hàm ổn định (không tạo lại mỗi lần render) để HandbagCard (memo) không vẽ lại thừa
+  const openDetail = useCallback(
+    (item) => navigation.navigate('Detail', { handbag: item }),
+    [navigation]
+  );
+
+  const renderRow = useCallback(
+    ({ item: row }) => {
+      if (row.type === 'wide') {
+        return (
+          <View style={styles.rowWide}>
+            <HandbagCard
+              item={row.item}
+              wide
+              onOpen={openDetail}
+              onFavorite={toggleFavorite}
+              isFavorite={isFavorite(row.item.id)}
+            />
+          </View>
+        );
+      }
+
+      const [first, second] = row.items;
+
+      return (
+        <View style={styles.productRow}>
           <View style={styles.productColumn}>
             <HandbagCard
               item={first}
-              onOpen={() => openDetail(first)}
+              onOpen={openDetail}
               onFavorite={toggleFavorite}
-              isFavorite={favoriteIds.includes(String(first.id))}
+              isFavorite={isFavorite(first.id)}
             />
           </View>
 
@@ -163,70 +165,39 @@ export default function HomeScreen({ navigation }) {
             {second && (
               <HandbagCard
                 item={second}
-                onOpen={() => openDetail(second)}
+                onOpen={openDetail}
                 onFavorite={toggleFavorite}
-                isFavorite={favoriteIds.includes(String(second.id))}
+                isFavorite={isFavorite(second.id)}
               />
             )}
           </View>
         </View>
       );
+    },
+    [openDetail, toggleFavorite, isFavorite]
+  );
 
-      index += 2;
+  const keyExtractor = useCallback((row) => row.key, []);
 
-      if (index < filteredProducts.length) {
-        const wideItem = filteredProducts[index];
+  // Phần đầu danh sách: header, tiêu đề, chip brand (cuộn cùng danh sách)
+  const listHeader = (
+    <>
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => navigation.navigate('Search')}
+          style={styles.headerButton}
+          hitSlop={8}
+        >
+          <Ionicons name="search-outline" size={24} color="#1A1A1A" />
+        </Pressable>
+      </View>
 
-        rows.push(
-          <HandbagCard
-            key={`wide-${wideItem.id}`}
-            item={wideItem}
-            wide
-            onOpen={() => openDetail(wideItem)}
-            onFavorite={toggleFavorite}
-            isFavorite={favoriteIds.includes(String(wideItem.id))}
-          />
-        );
+      <View style={styles.hero}>
+        <Text style={styles.heroTitle}>Designed for elegance.</Text>
+        <Text style={styles.heroBold}>Built for life.</Text>
+      </View>
 
-        index += 1;
-      }
-    }
-
-    return rows;
-  };
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F3F1F1" />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header: menu trái, search phải, không có logo */}
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => navigation.navigate('Search')}
-            style={styles.headerButton}
-            hitSlop={8}
-          >
-            <Ionicons name="menu-outline" size={26} color="#1A1A1A" />
-          </Pressable>
-
-          <Pressable
-            onPress={() => navigation.navigate('Search')}
-            style={styles.headerButton}
-            hitSlop={8}
-          >
-            <Ionicons name="search-outline" size={24} color="#1A1A1A" />
-          </Pressable>
-        </View>
-
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Designed for elegance.</Text>
-          <Text style={styles.heroBold}>Built for life.</Text>
-        </View>
-
+      {handbags.length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -253,19 +224,59 @@ export default function HomeScreen({ navigation }) {
             );
           })}
         </ScrollView>
+      )}
+    </>
+  );
 
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#292725"
-            style={styles.loader}
-          />
-        ) : filteredProducts.length > 0 ? (
-          <View style={styles.products}>{renderProductRows()}</View>
-        ) : (
-          <Text style={styles.emptyText}>No handbags for this brand.</Text>
-        )}
-      </ScrollView>
+  // Hiện khi không có hàng nào: đang tải / lỗi / rỗng / brand không có túi
+  let emptyContent;
+  if (loading) {
+    emptyContent = (
+      <ActivityIndicator size="large" color="#292725" style={styles.loader} />
+    );
+  } else if (error) {
+    emptyContent = (
+      <StateMessage
+        icon="cloud-offline-outline"
+        title="Something went wrong"
+        message={error}
+        actionLabel="Try again"
+        onAction={loadProducts}
+      />
+    );
+  } else if (handbags.length === 0) {
+    emptyContent = (
+      <StateMessage
+        icon="bag-outline"
+        title="No handbags yet"
+        message="The collection is empty right now."
+        actionLabel="Refresh"
+        onAction={loadProducts}
+      />
+    );
+  } else {
+    emptyContent = (
+      <Text style={styles.emptyText}>No handbags for this brand.</Text>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F3F1F1" />
+
+      <FlatList
+        data={loading ? [] : rows}
+        keyExtractor={keyExtractor}
+        renderItem={renderRow}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={emptyContent}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        windowSize={7}
+        removeClippedSubviews
+      />
     </SafeAreaView>
   );
 }
@@ -287,7 +298,7 @@ const styles = StyleSheet.create({
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
 
   headerButton: {
@@ -350,13 +361,14 @@ const styles = StyleSheet.create({
   },
 
   // Product grid
-  products: {
-    gap: 12,
-  },
 
   productRow: {
     flexDirection: 'row',
     gap: 12,
+    marginBottom: 12,
+  },
+  rowWide: {
+    marginBottom: 12,
   },
 
   productColumn: {
@@ -364,6 +376,38 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 
+  stateBox: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
+  stateTitle: {
+    marginTop: 14,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  stateText: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    color: '#77716A',
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 22,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#050505',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
   loader: {
     marginTop: 35,
   },
