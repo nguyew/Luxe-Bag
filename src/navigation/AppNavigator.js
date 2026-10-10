@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -6,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen from '../screens/HomeScreen';
 import DetailScreen from '../screens/DetailScreen';
-import FavoritesScreen from '../screens/FavoritesScreen';
+import FavoritesScreen from '../screens/FavouritesScreen';
 import SearchScreen from '../screens/SearchScreen';
 
 const Stack = createNativeStackNavigator();
