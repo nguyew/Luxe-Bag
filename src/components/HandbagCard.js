@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { formatPercentOff, formatPrice } from '../utils/format';
 
 /**
@@ -9,20 +10,26 @@ import { formatPercentOff, formatPrice } from '../utils/format';
  * Props:
  *  - item:       object handbag từ API { id, handbagName, brand, cost, percentOff, gender, uri, color }
  *  - wide:       true -> thẻ ngang (full width), mặc định thẻ đứng
- *  - onOpen:     gọi khi bấm vào thẻ (mở Detail)
+ *  - onOpen:     gọi khi bấm vào thẻ, nhận lại item (mở Detail)
  *  - isFavorite: đã yêu thích hay chưa
  *  - onFavorite: gọi khi bấm nút yêu thích, nhận lại item
  */
-export default function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
+function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
   const [imageFailed, setImageFailed] = useState(false);
+
+  // API trả `color` là mảng tên màu (["Red"]), chỉ dùng làm nền khi là mã hex
+  const backgroundColor =
+    typeof item.color === 'string' && item.color.startsWith('#')
+      ? item.color
+      : '#E7E3DF';
 
   return (
     <Pressable
-      onPress={onOpen}
+      onPress={() => onOpen?.(item)}
       style={[
         styles.productCard,
         wide ? styles.wideCard : styles.squareCard,
-        { backgroundColor: item.color || '#D8D8D8' },
+        { backgroundColor },
       ]}
     >
       {!imageFailed && item.uri ? (
@@ -38,19 +45,31 @@ export default function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite
         </View>
       )}
 
-      {/* Nút túi / yêu thích: ô vuông bo góc, nền trắng mờ */}
+      {/* Lớp phủ tối dần ở đáy để chữ trắng luôn đọc được trên ảnh sáng */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.62)']}
+        locations={[0, 1]}
+        style={styles.bottomScrim}
+      />
+
+      {/* Nút yêu thích: trái tim rỗng -> trái tim đầy khi đã thích */}
       <Pressable
         onPress={(event) => {
           event.stopPropagation?.();
           onFavorite(item);
         }}
-        style={styles.bagAction}
+        style={styles.favoriteButton}
         hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isFavorite ? 'Remove from favorites' : 'Add to favorites'
+        }
       >
         <Ionicons
-          name={isFavorite ? 'heart' : 'bag-outline'}
-          size={16}
-          color={isFavorite ? '#B74B42' : '#FFFFFF'}
+          name={isFavorite ? 'heart' : 'heart-outline'}
+          size={18}
+          color={isFavorite ? '#FF4D5E' : '#FFFFFF'}
         />
       </Pressable>
 
@@ -77,25 +96,27 @@ export default function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite
         </Text>
       )}
 
-      {/* Brand + tên (trái), giá + % giảm (phải) đè lên ảnh */}
-      <View style={styles.productCaption}>
-        <View style={styles.captionLeft}>
+      {/* Caption đè lên ảnh.
+          - Thẻ đứng: brand + tên (tối đa 2 dòng) ở trên, giá + % giảm ở dưới.
+          - Thẻ rộng: brand + tên bên trái, giá + % giảm bên phải. */}
+      <View style={[styles.productCaption, !wide && styles.captionStacked]}>
+        <View style={[styles.captionLeft, !wide && styles.captionLeftStacked]}>
           {!!item.brand && (
             <Text style={styles.productCaptionBrand} numberOfLines={1}>
               {item.brand}
             </Text>
           )}
-          <Text style={styles.productCaptionName} numberOfLines={1}>
+          <Text style={styles.productCaptionName} numberOfLines={2}>
             {item.handbagName}
           </Text>
         </View>
 
-        <View style={styles.captionRight}>
+        <View style={[styles.captionRight, !wide && styles.captionRightRow]}>
           <Text style={styles.productCaptionPrice}>
             {formatPrice(item.cost)}
           </Text>
           {!!formatPercentOff(item.percentOff) && (
-            <View style={styles.discountPill}>
+            <View style={[styles.discountPill, !wide && styles.discountPillRow]}>
               <Text style={styles.discountText}>
                 {formatPercentOff(item.percentOff)} off
               </Text>
@@ -130,17 +151,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Nút túi (ô vuông bo góc, mờ)
-  bagAction: {
+  // Nút yêu thích (ô vuông bo góc, nền tối mờ)
+  favoriteButton: {
     position: 'absolute',
     right: 12,
     top: 12,
     width: 32,
     height: 32,
     borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.28)',
+    backgroundColor: 'rgba(0,0,0,0.30)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bottomScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '48%',
   },
 
   // Tên + giá đè trên ảnh
@@ -162,6 +190,22 @@ const styles = StyleSheet.create({
   captionRight: {
     alignItems: 'flex-end',
   },
+  // Thẻ đứng: xếp dọc để tên có đủ bề ngang cho 2 dòng
+  captionStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    justifyContent: 'flex-end',
+  },
+  captionLeftStacked: {
+    flex: 0,
+    marginRight: 0,
+    marginBottom: 6,
+  },
+  captionRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
 
   productCaptionBrand: {
     fontSize: 10,
@@ -174,6 +218,7 @@ const styles = StyleSheet.create({
 
   productCaptionName: {
     fontSize: 12,
+    lineHeight: 16,
     color: '#FFFFFF',
     fontWeight: '600',
     textShadowColor: 'rgba(0,0,0,0.25)',
@@ -219,6 +264,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.92)',
   },
 
+  discountPillRow: {
+    marginTop: 0,
+  },
   discountText: {
     fontSize: 10,
     fontWeight: '700',
@@ -236,3 +284,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 });
+
+// memo: thẻ chỉ vẽ lại khi props thật sự đổi (quan trọng khi cuộn FlatList)
+export default React.memo(HandbagCard);
