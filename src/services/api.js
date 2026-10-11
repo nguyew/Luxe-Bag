@@ -3,13 +3,13 @@
  *
  * Địa chỉ gốc đọc từ file .env ở thư mục gốc của project:
  *   EXPO_PUBLIC_API_URL=https://abc123.mockapi.io/api/v1
- * (không có "/handbags" và không có dấu "/" ở cuối).
+ * (không cần "/handbags" ở cuối; nếu lỡ dán thì code tự bỏ đi).
  * Sửa .env xong phải khởi động lại: npx expo start -c
  */
-export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(
-  /\/+$/,
-  ''
-);
+export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || '')
+  .trim()
+  .replace(/\/+$/, '') // bỏ dấu "/" ở cuối
+  .replace(/\/handbags$/i, ''); // lỡ dán cả "/handbags" thì tự bỏ đi
 
 const RESOURCE = 'handbags';
 const TIMEOUT_MS = 10000;
