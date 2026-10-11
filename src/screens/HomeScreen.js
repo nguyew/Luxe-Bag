@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   FlatList,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -12,9 +10,21 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getHandbags } from '../services/api';
 import HandbagCard from '../components/HandbagCard';
 import useFavorites from '../hooks/useFavorites';
+
+// Mỗi túi cần một id duy nhất (dùng làm key và để lưu yêu thích).
+// MockAPI thường tự thêm `id`; nếu thiếu thì thử các tên khác rồi mới tự tạo.
+function ensureId(item, index) {
+  const raw = item.id ?? item.ID ?? item._id ?? item.handbagId;
+  if (raw !== undefined && raw !== null && raw !== '') return String(raw);
+  const slug = `${item.brand || 'bag'}-${item.handbagName || index}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-');
+  return `local-${slug}-${index}`;
+}
 
 // Khối thông báo lỗi / danh sách rỗng, có nút thử lại
 function StateMessage({ icon, title, message, actionLabel, onAction }) {
@@ -59,8 +69,9 @@ export default function HomeScreen({ navigation }) {
       }
 
       setHandbags(
-        data.map((item) => ({
+        data.map((item, index) => ({
           ...item,
+          id: ensureId(item, index),
           uri: item.uri || item.image || item.imageUrl || '',
         }))
       );
@@ -107,7 +118,7 @@ export default function HomeScreen({ navigation }) {
 
     while (index < filteredProducts.length) {
       result.push({
-        key: `pair-${filteredProducts[index].id}`,
+        key: `pair-${index}-${filteredProducts[index].id}`,
         type: 'pair',
         items: filteredProducts.slice(index, index + 2),
       });
@@ -115,7 +126,7 @@ export default function HomeScreen({ navigation }) {
 
       if (index < filteredProducts.length) {
         result.push({
-          key: `wide-${filteredProducts[index].id}`,
+          key: `wide-${index}-${filteredProducts[index].id}`,
           type: 'wide',
           item: filteredProducts[index],
         });
@@ -261,7 +272,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F3F1F1" />
 
       <FlatList
@@ -285,7 +296,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F3F1F1',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
 
   scrollContent: {
