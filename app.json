@@ -28,6 +28,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "LuxeBag uses your photos so you can choose a profile picture.",
+          "cameraPermission": "LuxeBag uses your camera so you can take a profile picture.",
+          "microphonePermission": false
+        }
       ]
     ]
   }

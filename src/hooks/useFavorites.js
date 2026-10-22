@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import {
+  clearFavorites as clearFavoritesInStorage,
   getFavorites,
+  removeFavorite as removeFavoriteInStorage,
   subscribeFavorites,
   toggleFavorite as toggleFavoriteInStorage,
 } from '../services/favoriteService';
@@ -45,9 +47,10 @@ export default function useFavorites() {
     [favoriteIds]
   );
 
-  const toggleFavorite = useCallback(async (handbag) => {
+  // Chạy một thao tác ghi; lỗi thì báo cho người dùng và trả về null
+  const run = useCallback(async (task) => {
     try {
-      return await toggleFavoriteInStorage(handbag);
+      return await task();
     } catch {
       Alert.alert(
         'Favorites',
@@ -57,5 +60,30 @@ export default function useFavorites() {
     }
   }, []);
 
-  return { favorites, favoriteIds, isFavorite, toggleFavorite, ready };
+  const toggleFavorite = useCallback(
+    (handbag) => run(() => toggleFavoriteInStorage(handbag)),
+    [run]
+  );
+
+  // Xóa một túi theo id
+  const removeFavorite = useCallback(
+    (id) => run(() => removeFavoriteInStorage(id)),
+    [run]
+  );
+
+  // Xóa tất cả
+  const clearFavorites = useCallback(
+    () => run(() => clearFavoritesInStorage()),
+    [run]
+  );
+
+  return {
+    favorites,
+    favoriteIds,
+    isFavorite,
+    toggleFavorite,
+    removeFavorite,
+    clearFavorites,
+    ready,
+  };
 }
