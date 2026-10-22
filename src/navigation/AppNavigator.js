@@ -168,6 +168,8 @@ export default function AppNavigator() {
         options={{
           title: 'Handbag Details',
           headerTintColor: '#1A1A1A',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F3F1F1' },
         }}
       />
     </Stack.Navigator>
