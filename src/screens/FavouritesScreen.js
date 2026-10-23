@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  LayoutAnimation,
   Pressable,
   RefreshControl,
   StatusBar,
@@ -14,50 +15,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FavoriteItem from '../components/FavoriteItem';
 import useFavorites from '../hooks/useFavorites';
-import { getHandbags } from '../services/api';
+import useHandbags from '../hooks/useHandbags';
 
 export default function FavoritesScreen({ navigation }) {
   const { favorites, ready, removeFavorite, clearFavorites } = useFavorites();
-  const [fresh, setFresh] = useState({}); // dữ liệu mới nhất từ API, theo id
-  const [refreshing, setRefreshing] = useState(false);
-  const mountedRef = useRef(true);
+  const { items: catalog, reload } = useHandbags();
+  const [pulling, setPulling] = useState(false);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // Danh sách yêu thích lưu bản sao của túi lúc bấm tim, nên có thể cũ
-  // (ví dụ giá hay feedback đã đổi). Tải lại từ API để hiển thị bản mới nhất.
-  // Nếu mất mạng thì vẫn dùng bản đã lưu trên máy.
-  const syncFromApi = useCallback(async () => {
-    try {
-      const data = await getHandbags();
-      if (!mountedRef.current) return;
-
-      const byId = {};
-      data.forEach((handbag) => {
-        if (handbag && handbag.id !== undefined && handbag.id !== null) {
-          byId[String(handbag.id)] = handbag;
-        }
-      });
-      setFresh(byId);
-    } catch {
-      // giữ nguyên dữ liệu đã lưu
-    }
-  }, []);
-
-  useEffect(() => {
-    syncFromApi();
-  }, [syncFromApi]);
-
+  // Kéo xuống để làm mới dữ liệu từ API
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await syncFromApi();
-    if (mountedRef.current) setRefreshing(false);
-  }, [syncFromApi]);
+    setPulling(true);
+    await reload();
+    setPulling(false);
+  }, [reload]);
+
+  // Danh sách yêu thích lưu bản sao của túi lúc bấm tim, nên có thể cũ (giá,
+  // feedback...). Dùng bản mới nhất từ kho dùng chung; mất mạng thì vẫn hiển
+  // thị bản đã lưu trên máy.
+  const fresh = useMemo(() => {
+    const byId = {};
+    catalog.forEach((handbag) => {
+      byId[String(handbag.id)] = handbag;
+    });
+    return byId;
+  }, [catalog]);
 
   // Ghép bản mới từ API (nếu có) lên bản đã lưu
   const items = useMemo(
@@ -75,7 +56,10 @@ export default function FavoritesScreen({ navigation }) {
   );
 
   const handleRemove = useCallback(
-    (item) => removeFavorite(item.id),
+    (item) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      removeFavorite(item.id);
+    },
     [removeFavorite]
   );
 
@@ -86,7 +70,14 @@ export default function FavoritesScreen({ navigation }) {
       `This removes ${count} ${count === 1 ? 'handbag' : 'handbags'} from your favorites.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Clear all', style: 'destructive', onPress: clearFavorites },
+        {
+          text: 'Clear all',
+          style: 'destructive',
+          onPress: () => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            clearFavorites();
+          },
+        },
       ]
     );
   }, [favorites.length, clearFavorites]);
@@ -166,7 +157,7 @@ export default function FavoritesScreen({ navigation }) {
         windowSize={7}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={pulling}
             onRefresh={onRefresh}
             tintColor="#292725"
           />

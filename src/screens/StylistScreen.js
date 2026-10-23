@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,9 +12,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RemoteImage from '../components/RemoteImage';
 import StarRating from '../components/StarRating';
 import useFavorites from '../hooks/useFavorites';
-import { getHandbags } from '../services/api';
+import useHandbags from '../hooks/useHandbags';
 import {
   MAX_REQUEST_LENGTH,
   askStylist,
@@ -38,7 +38,6 @@ const makeId = () => `m${nextId++}`;
 // Thẻ gợi ý: ảnh nhỏ, thông tin, lý do của AI, nút tim
 const PickCard = React.memo(function PickCard({ pick, favorite, onOpen, onToggle }) {
   const { handbag, reason } = pick;
-  const [imageFailed, setImageFailed] = useState(false);
   const discount = formatPercentOff(handbag.percentOff);
   const reviews = useMemo(
     () => summarizeFeedbacks(normalizeFeedbacks(handbag.feedbacks)),
@@ -53,18 +52,7 @@ const PickCard = React.memo(function PickCard({ pick, favorite, onOpen, onToggle
       accessibilityLabel={`${handbag.handbagName}, open details`}
     >
       <View style={styles.pickThumb}>
-        {!imageFailed && handbag.uri ? (
-          <Image
-            source={{ uri: handbag.uri }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <View style={styles.pickThumbFallback}>
-            <Ionicons name="bag-outline" size={26} color="#FFFFFF" />
-          </View>
-        )}
+        <RemoteImage uri={handbag.uri} style={StyleSheet.absoluteFill} iconSize={26} />
       </View>
 
       <View style={styles.pickInfo}>
@@ -110,8 +98,11 @@ export default function StylistScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { isFavorite, toggleFavorite } = useFavorites();
 
-  const [handbags, setHandbags] = useState([]);
-  const [catalogState, setCatalogState] = useState('loading'); // loading | ready | error
+  // Danh mục lấy từ kho dùng chung: mở màn hình là có sẵn, không phải chờ tải lại
+  const { items: handbags, loading, error, reload: loadCatalog } = useHandbags();
+  const catalogState =
+    handbags.length > 0 ? 'ready' : loading ? 'loading' : error ? 'error' : 'ready';
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -127,30 +118,6 @@ export default function StylistScreen({ navigation }) {
       if (abortRef.current) abortRef.current.abort(); // rời màn hình thì hủy yêu cầu
     };
   }, []);
-
-  const loadCatalog = useCallback(async () => {
-    setCatalogState('loading');
-    try {
-      const data = await getHandbags();
-      if (!mountedRef.current) return;
-      setHandbags(
-        data
-          .filter((item) => item && item.id !== undefined && item.id !== null)
-          .map((item) => ({
-            ...item,
-            id: String(item.id),
-            uri: item.uri || item.image || item.imageUrl || '',
-          }))
-      );
-      setCatalogState('ready');
-    } catch {
-      if (mountedRef.current) setCatalogState('error');
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCatalog();
-  }, [loadCatalog]);
 
   // Gửi một yêu cầu cho AI (dùng cả cho "Try again")
   const run = useCallback(

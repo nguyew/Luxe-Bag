@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import RemoteImage from './RemoteImage';
 import { formatPercentOff, formatPrice } from '../utils/format';
 
 /**
@@ -15,8 +16,6 @@ import { formatPercentOff, formatPrice } from '../utils/format';
  *  - onFavorite: gọi khi bấm nút yêu thích, nhận lại item
  */
 function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
   // API trả `color` là mảng tên màu (["Red"]), chỉ dùng làm nền khi là mã hex
   const backgroundColor =
     typeof item.color === 'string' && item.color.startsWith('#')
@@ -26,24 +25,15 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
   return (
     <Pressable
       onPress={() => onOpen?.(item)}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.handbagName}, ${item.brand || ''}, ${formatPrice(item.cost)}`}
       style={[
         styles.productCard,
         wide ? styles.wideCard : styles.squareCard,
         { backgroundColor },
       ]}
     >
-      {!imageFailed && item.uri ? (
-        <Image
-          source={{ uri: item.uri }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <View style={styles.imageFallback}>
-          <Ionicons name="bag-outline" size={48} color="#FFFFFF" />
-        </View>
-      )}
+      <RemoteImage uri={item.uri} style={StyleSheet.absoluteFill} iconSize={48} />
 
       {/* Lớp phủ tối dần ở đáy để chữ trắng luôn đọc được trên ảnh sáng */}
       <LinearGradient
