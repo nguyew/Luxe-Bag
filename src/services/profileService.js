@@ -11,7 +11,8 @@ import { File, Paths } from 'expo-file-system';
  *   của app trên iOS có thể đổi sau khi cập nhật app.
  */
 
-const STORAGE_KEY = '@luxebag/profile';
+const BASE_KEY = '@luxebag/profile';
+let storageKey = BASE_KEY; // mỗi tài khoản một hồ sơ: '@luxebag/profile:<userId>'
 const FILE_NAME_PATTERN = /^[\w.-]+$/;
 
 export const NAME_MAX_LENGTH = 30;
@@ -36,9 +37,14 @@ function sanitize(raw) {
   return { name, avatarFile };
 }
 
+/** Đổi chủ sở hữu hồ sơ (gọi khi đăng nhập / đăng xuất). */
+export async function setProfileOwner(ownerId) {
+  storageKey = ownerId ? `${BASE_KEY}:${String(ownerId)}` : BASE_KEY;
+}
+
 export async function loadProfile() {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(storageKey);
     if (!raw) return { ...DEFAULT_PROFILE };
     return sanitize(JSON.parse(raw));
   } catch {
@@ -50,7 +56,7 @@ export async function loadProfile() {
 export async function updateProfile(patch) {
   const current = await loadProfile();
   const next = sanitize({ ...current, ...patch });
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  await AsyncStorage.setItem(storageKey, JSON.stringify(next));
   return next;
 }
 

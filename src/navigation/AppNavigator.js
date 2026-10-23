@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native';
 
 import HomeScreen from '../screens/HomeScreen';
 import DetailScreen from '../screens/DetailScreen';
@@ -12,6 +12,10 @@ import CartScreen from '../screens/CartScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchScreen from '../screens/SearchScreen';
 import StylistScreen from '../screens/StylistScreen';
+import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import AdminHomeScreen from '../screens/AdminHomeScreen';
+import useAuth from '../hooks/useAuth';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -144,52 +148,82 @@ function MainTabs() {
   );
 }
 
+const detailHeader = {
+  headerTintColor: '#1A1A1A',
+  headerShadowVisible: false,
+  headerStyle: { backgroundColor: '#F3F1F1' },
+};
+
+/**
+ * Điều hướng theo trạng thái đăng nhập (cách React Navigation khuyến nghị:
+ * chỉ khai báo những màn hình mà người dùng hiện tại được phép vào).
+ *  - Khách / khách hàng: tabs + Search + Stylist + Detail (khách duyệt hàng tự do).
+ *  - Admin: chỉ có khu quản trị.
+ *  - Khách chưa đăng nhập: thêm Login / Register (dạng modal).
+ * Đăng nhập xong màn Login tự biến mất và giao diện đổi theo role.
+ */
 export default function AppNavigator() {
+  const { loading, isLoggedIn, isAdmin } = useAuth();
+
+  // Đang đọc phiên đã lưu (vài mili-giây) -> chưa vẽ gì để khỏi nháy sai giao diện
+  if (loading) {
+    return (
+      <View style={styles.boot}>
+        <ActivityIndicator size="large" color="#292725" />
+      </View>
+    );
+  }
+
   return (
     <Stack.Navigator>
-      <Stack.Screen
-        name="MainTabs"
-        component={MainTabs}
-        options={{ headerShown: false }}
-      />
+      {isAdmin ? (
+        <Stack.Screen
+          name="AdminHome"
+          component={AdminHomeScreen}
+          options={{ headerShown: false }}
+        />
+      ) : (
+        <>
+          <Stack.Screen
+            name="MainTabs"
+            component={MainTabs}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Search"
+            component={SearchScreen}
+            options={{ title: 'Search', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="Stylist"
+            component={StylistScreen}
+            options={{ title: 'AI Stylist', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="Detail"
+            component={DetailScreen}
+            options={{ title: 'Handbag Details', ...detailHeader }}
+          />
+        </>
+      )}
 
-      <Stack.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{
-          title: 'Search',
-          headerTintColor: '#1A1A1A',
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: '#F3F1F1' },
-        }}
-      />
-
-      <Stack.Screen
-        name="Stylist"
-        component={StylistScreen}
-        options={{
-          title: 'AI Stylist',
-          headerTintColor: '#1A1A1A',
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: '#F3F1F1' },
-        }}
-      />
-
-      <Stack.Screen
-        name="Detail"
-        component={DetailScreen}
-        options={{
-          title: 'Handbag Details',
-          headerTintColor: '#1A1A1A',
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: '#F3F1F1' },
-        }}
-      />
+      {!isLoggedIn && (
+        <Stack.Group screenOptions={{ presentation: 'modal', headerShown: false }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+        </Stack.Group>
+      )}
     </Stack.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
+  boot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F1F1',
+  },
   wrapper: {
     position: 'absolute',
     left: 0,
