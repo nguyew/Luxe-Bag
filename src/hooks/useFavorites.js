@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import {
   clearFavorites as clearFavoritesInStorage,
@@ -7,6 +7,7 @@ import {
   subscribeFavorites,
   toggleFavorite as toggleFavoriteInStorage,
 } from '../services/favoriteService';
+import { tapLight, tapSelect } from '../utils/haptics';
 
 /**
  * Hook dùng chung cho Home, Detail, Favorites, Search.
@@ -42,6 +43,11 @@ export default function useFavorites() {
     [favorites]
   );
 
+  // Giữ danh sách id mới nhất trong ref để toggleFavorite biết đang thêm hay xóa
+  // mà KHÔNG phải tạo lại hàm mỗi lần danh sách đổi (tránh vẽ lại mọi thẻ).
+  const favoriteIdsRef = useRef(favoriteIds);
+  favoriteIdsRef.current = favoriteIds;
+
   const isFavorite = useCallback(
     (id) => favoriteIds.has(String(id)),
     [favoriteIds]
@@ -61,13 +67,21 @@ export default function useFavorites() {
   }, []);
 
   const toggleFavorite = useCallback(
-    (handbag) => run(() => toggleFavoriteInStorage(handbag)),
+    (handbag) => {
+      // rung nhẹ khi thêm, rung "chọn" khi bỏ
+      if (favoriteIdsRef.current.has(String(handbag.id))) tapSelect();
+      else tapLight();
+      return run(() => toggleFavoriteInStorage(handbag));
+    },
     [run]
   );
 
   // Xóa một túi theo id
   const removeFavorite = useCallback(
-    (id) => run(() => removeFavoriteInStorage(id)),
+    (id) => {
+      tapSelect();
+      return run(() => removeFavoriteInStorage(id));
+    },
     [run]
   );
 

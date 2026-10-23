@@ -49,7 +49,10 @@ async function request(path) {
 /** Lấy toàn bộ túi xách. Ném lỗi nếu gọi thất bại (Home sẽ hiện nút "Try again"). */
 export async function getHandbags() {
   const data = await request(RESOURCE);
-  return Array.isArray(data) ? data : [];
+  // Không trả về [] khi dữ liệu lạ: nếu vậy kho dữ liệu sẽ tưởng cửa hàng
+  // trống và ghi đè bản sao tốt đang có
+  if (!Array.isArray(data)) throw new Error('Unexpected response from the server.');
+  return data;
 }
 
 /** Lấy một túi theo id (dùng cho Detail nếu cần tải lại). */
