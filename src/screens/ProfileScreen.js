@@ -16,6 +16,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import SignInPrompt from '../components/SignInPrompt';
+import useAuth from '../hooks/useAuth';
 import PhotoActionSheet from '../components/PhotoActionSheet';
 import useFavorites from '../hooks/useFavorites';
 import {
@@ -24,7 +26,6 @@ import {
   loadProfile,
   removeAvatar,
   setAvatarFromUri,
-  updateProfile,
 } from '../services/profileService';
 
 // Ảnh vuông, nén nhẹ: đủ nét cho ảnh đại diện mà không tốn dung lượng
@@ -36,6 +37,7 @@ const PICKER_OPTIONS = {
 
 export default function ProfileScreen({ navigation }) {
   const { favorites } = useFavorites();
+  const { user, isLoggedIn, updateAccount, logout } = useAuth();
 
   const [profile, setProfile] = useState(null); // null = đang tải
   const [nameDraft, setNameDraft] = useState('');
@@ -52,14 +54,25 @@ export default function ProfileScreen({ navigation }) {
     };
   }, []);
 
-  // Đọc hồ sơ đã lưu khi mở màn hình
+  // Ảnh đại diện lưu riêng theo từng tài khoản: đọc lại mỗi khi đổi tài khoản
+  const userId = user?.id;
   useEffect(() => {
+    setProfile(null);
+    if (!userId) return undefined;
+
+    let cancelled = false;
     loadProfile().then((saved) => {
-      if (!mountedRef.current) return;
-      setProfile(saved);
-      setNameDraft(saved.name);
+      if (!cancelled && mountedRef.current) setProfile(saved);
     });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // Tên hiển thị lấy từ tài khoản (lưu trên API)
+  useEffect(() => {
+    setNameDraft(user?.name || '');
+  }, [user?.name]);
 
   // Lưu ảnh người dùng vừa chọn/chụp
   const applyPickedAsset = useCallback(async (asset) => {
@@ -163,24 +176,50 @@ export default function ProfileScreen({ navigation }) {
   }, []);
 
   const saveName = useCallback(async () => {
+    if (!user) return;
     const trimmed = nameDraft.trim();
-    setNameDraft(trimmed);
-    if (!profile || trimmed === profile.name) return;
+
+    // Không cho để trống tên: trả về tên hiện tại
+    if (!trimmed || trimmed === user.name) {
+      setNameDraft(user.name);
+      return;
+    }
 
     try {
-      const next = await updateProfile({ name: trimmed });
-      if (mountedRef.current) setProfile(next);
+      await updateAccount({ name: trimmed });
     } catch {
+      setNameDraft(user.name);
       Alert.alert('Profile', 'Could not save your name. Please try again.');
     }
-  }, [nameDraft, profile]);
+  }, [nameDraft, user, updateAccount]);
+
+  const confirmLogout = () => {
+    Alert.alert('Sign out?', 'You can sign back in anytime.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: () => logout() },
+    ]);
+  };
+
+  // Khách chưa đăng nhập
+  if (!isLoggedIn) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F3F1F1" />
+        <SignInPrompt
+          icon="person-outline"
+          title="Your profile"
+          message="Sign in to manage your account, favorites and orders."
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (!profile) {
     return <SafeAreaView style={styles.safeArea} edges={['top']} />;
   }
 
   const avatarUri = getAvatarUri(profile);
-  const initial = profile.name ? profile.name.charAt(0).toUpperCase() : '';
+  const initial = user.name ? user.name.charAt(0).toUpperCase() : '';
 
   const sheetOptions = [
     {
@@ -270,6 +309,14 @@ export default function ProfileScreen({ navigation }) {
           />
         </View>
 
+        {/* Email đăng nhập (chỉ đọc) */}
+        <View style={styles.card}>
+          <Text style={styles.fieldLabel}>Email</Text>
+          <Text style={styles.readonlyValue} numberOfLines={1}>
+            {user.email}
+          </Text>
+        </View>
+
         {/* Lối tắt tới danh sách yêu thích */}
         <Pressable
           onPress={() => navigation.navigate('Favorites')}
@@ -286,6 +333,16 @@ export default function ProfileScreen({ navigation }) {
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#9A948D" />
+        </Pressable>
+
+        <Pressable
+          onPress={confirmLogout}
+          style={styles.logoutButton}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Ionicons name="log-out-outline" size={18} color="#B3261E" />
+          <Text style={styles.logoutText}>Sign out</Text>
         </Pressable>
       </ScrollView>
 
@@ -415,5 +472,29 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 12,
     color: '#77716A',
+  },
+
+  // Email chỉ đọc
+  readonlyValue: {
+    fontSize: 16,
+    color: '#55514C',
+  },
+
+  // Đăng xuất
+  logoutButton: {
+    alignSelf: 'center',
+    marginTop: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 42,
+    paddingHorizontal: 20,
+    borderRadius: 21,
+    backgroundColor: '#FBE3E1',
+  },
+  logoutText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#B3261E',
   },
 });

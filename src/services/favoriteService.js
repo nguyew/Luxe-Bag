@@ -11,7 +11,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  *   nên xóa ở màn này thì màn kia cập nhật ngay.
  */
 
-const STORAGE_KEY = '@luxebag/favorites';
+// Khách (chưa đăng nhập) dùng khóa gốc (giữ nguyên dữ liệu cũ trên máy);
+// mỗi tài khoản có danh sách riêng: '@luxebag/favorites:<userId>'
+const GUEST_KEY = '@luxebag/favorites';
+let storageKey = GUEST_KEY;
 
 const listeners = new Set();
 let queue = Promise.resolve();
@@ -35,7 +38,7 @@ function notify(list) {
 
 async function readList() {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -46,9 +49,20 @@ async function readList() {
 }
 
 async function writeList(list) {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  await AsyncStorage.setItem(storageKey, JSON.stringify(list));
   notify(list);
   return list;
+}
+
+/**
+ * Đổi chủ sở hữu danh sách (gọi khi đăng nhập / đăng xuất).
+ * ownerId = null -> danh sách của khách. Các màn đang lắng nghe tự cập nhật.
+ */
+export function setFavoritesOwner(ownerId) {
+  return enqueue(async () => {
+    storageKey = ownerId ? `${GUEST_KEY}:${String(ownerId)}` : GUEST_KEY;
+    notify(await readList());
+  });
 }
 
 /** Lấy toàn bộ danh sách yêu thích (mới thêm nằm trước). */
@@ -86,7 +100,7 @@ export function removeFavorite(id) {
 /** Xóa tất cả. Trả về danh sách rỗng. */
 export function clearFavorites() {
   return enqueue(async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    await AsyncStorage.removeItem(storageKey);
     notify([]);
     return [];
   });
