@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,21 +11,11 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getHandbags } from '../services/api';
 import HandbagCard from '../components/HandbagCard';
 import useFavorites from '../hooks/useFavorites';
-
-// Mỗi túi cần một id duy nhất (dùng làm key và để lưu yêu thích).
-// MockAPI thường tự thêm `id`; nếu thiếu thì thử các tên khác rồi mới tự tạo.
-function ensureId(item, index) {
-  const raw = item.id ?? item.ID ?? item._id ?? item.handbagId;
-  if (raw !== undefined && raw !== null && raw !== '') return String(raw);
-  const slug = `${item.brand || 'bag'}-${item.handbagName || index}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-');
-  return `local-${slug}-${index}`;
-}
+import useHandbags from '../hooks/useHandbags';
 
 // Khối thông báo lỗi / danh sách rỗng, có nút thử lại
 function StateMessage({ icon, title, message, actionLabel, onAction }) {
@@ -41,52 +32,26 @@ function StateMessage({ icon, title, message, actionLabel, onAction }) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const [handbags, setHandbags] = useState([]);
+  // Dữ liệu dùng chung với Search/Stylist/Favorites; có sẵn bản lưu trên máy nên
+  // mở app là thấy ngay, mất mạng vẫn xem được bộ sưu tập đã tải.
+  const { items: handbags, loading, error, reload, revalidate } = useHandbags();
   const [selectedBrand, setSelectedBrand] = useState('All');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [pulling, setPulling] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
-  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  // Quay lại tab Home (ví dụ từ Detail): nếu dữ liệu đã cũ thì làm mới ngầm
+  useFocusEffect(
+    useCallback(() => {
+      revalidate();
+    }, [revalidate])
+  );
 
-  // Tải danh sách túi từ MockAPI. Dùng lại được cho nút "Try again".
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await getHandbags();
-      if (!mountedRef.current) return;
-
-      if (!Array.isArray(data)) {
-        throw new Error('Unexpected response from the server.');
-      }
-
-      setHandbags(
-        data.map((item, index) => ({
-          ...item,
-          id: ensureId(item, index),
-          uri: item.uri || item.image || item.imageUrl || '',
-        }))
-      );
-    } catch {
-      if (mountedRef.current) {
-        setError('Could not load handbags. Check your connection and try again.');
-      }
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+  // Kéo xuống để làm mới
+  const onPullRefresh = useCallback(async () => {
+    setPulling(true);
+    await reload();
+    setPulling(false);
+  }, [reload]);
 
   // Danh sách brand lấy từ dữ liệu API: "All" + các brand không trùng, xếp A-Z
   const brands = useMemo(() => {
@@ -97,6 +62,11 @@ export default function HomeScreen({ navigation }) {
     );
     return ['All', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
   }, [handbags]);
+
+  // Brand đang chọn không còn trong dữ liệu mới -> quay về "All"
+  useEffect(() => {
+    if (!brands.includes(selectedBrand)) setSelectedBrand('All');
+  }, [brands, selectedBrand]);
 
   // Lọc theo brand đang chọn, rồi sắp xếp giá giảm dần (theo đề bài)
   const filteredProducts = useMemo(() => {
@@ -213,6 +183,20 @@ export default function HomeScreen({ navigation }) {
         </Pressable>
       </View>
 
+      {!!error && handbags.length > 0 && (
+        <Pressable
+          onPress={reload}
+          style={styles.offlineBanner}
+          accessibilityRole="button"
+          accessibilityLabel="Offline. Showing saved collection. Tap to retry."
+        >
+          <Ionicons name="cloud-offline-outline" size={16} color="#8A5A00" />
+          <Text style={styles.offlineText}>
+            Offline – showing your saved collection. Tap to retry.
+          </Text>
+        </Pressable>
+      )}
+
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Designed for elegance.</Text>
         <Text style={styles.heroBold}>Built for life.</Text>
@@ -255,14 +239,14 @@ export default function HomeScreen({ navigation }) {
     emptyContent = (
       <ActivityIndicator size="large" color="#292725" style={styles.loader} />
     );
-  } else if (error) {
+  } else if (error && handbags.length === 0) {
     emptyContent = (
       <StateMessage
         icon="cloud-offline-outline"
         title="Something went wrong"
         message={error}
         actionLabel="Try again"
-        onAction={loadProducts}
+        onAction={reload}
       />
     );
   } else if (handbags.length === 0) {
@@ -272,7 +256,7 @@ export default function HomeScreen({ navigation }) {
         title="No handbags yet"
         message="The collection is empty right now."
         actionLabel="Refresh"
-        onAction={loadProducts}
+        onAction={reload}
       />
     );
   } else {
@@ -291,6 +275,13 @@ export default function HomeScreen({ navigation }) {
         renderItem={renderRow}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={emptyContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={pulling}
+            onRefresh={onPullRefresh}
+            tintColor="#292725"
+          />
+        }
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         initialNumToRender={3}
@@ -327,6 +318,23 @@ const styles = StyleSheet.create({
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Banner khi mất mạng nhưng vẫn có dữ liệu đã lưu
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: '#FFF1D6',
+  },
+  offlineText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#8A5A00',
   },
 
   // Hero

@@ -1,20 +1,24 @@
-import React, { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackSection from '../components/FeedbackSection';
+import RemoteImage from '../components/RemoteImage';
 import StarRating from '../components/StarRating';
 import useFavorites from '../hooks/useFavorites';
+import { useHandbag } from '../hooks/useHandbags';
 import { formatPercentOff, formatPrice } from '../utils/format';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
 
 const BAR_HEIGHT = 56;
 
 export default function DetailScreen({ route }) {
-  const handbag = route.params?.handbag;
+  // Dữ liệu truyền qua route hiện ngay; bản mới nhất trong kho (ví dụ feedback
+  // vừa thêm) sẽ tự thay thế khi có.
+  const param = route.params?.handbag;
+  const handbag = useHandbag(param?.id, param);
   const insets = useSafeAreaInsets();
   const { isFavorite, toggleFavorite } = useFavorites();
-  const [imageFailed, setImageFailed] = useState(false);
 
   // Điểm trung bình hiển thị ngay dưới tên túi
   const summary = useMemo(
@@ -52,18 +56,11 @@ export default function DetailScreen({ route }) {
       >
         {/* Ảnh lớn + gender + yêu thích */}
         <View style={styles.imageWrap}>
-          {!imageFailed && handbag.uri ? (
-            <Image
-              source={{ uri: handbag.uri }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-              onError={() => setImageFailed(true)}
-            />
-          ) : (
-            <View style={styles.imageFallback}>
-              <Ionicons name="bag-outline" size={64} color="#FFFFFF" />
-            </View>
-          )}
+          <RemoteImage
+            uri={handbag.uri}
+            style={StyleSheet.absoluteFill}
+            iconSize={64}
+          />
 
           {hasGender && (
             <View

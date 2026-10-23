@@ -132,7 +132,8 @@ function FloatingTabBar({ state, navigation }) {
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{ headerShown: false }}
+      // freezeOnBlur: tab đang ẩn không vẽ lại khi dữ liệu đổi -> chuyển tab nhẹ hơn
+      screenOptions={{ headerShown: false, freezeOnBlur: true }}
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
       <Tab.Screen name="Home" component={HomeScreen} />

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HandbagCard from '../components/HandbagCard';
 import useFavorites from '../hooks/useFavorites';
-import { getHandbags } from '../services/api';
+import useHandbags from '../hooks/useHandbags';
 import { filterHandbags } from '../utils/search';
 
 const DEBOUNCE_MS = 200;
@@ -36,50 +36,10 @@ export default function SearchScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { isFavorite, toggleFavorite } = useFavorites();
 
-  const [handbags, setHandbags] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Dữ liệu từ kho dùng chung: mở Search là có sẵn ngay, không còn vòng xoay chờ
+  const { items: handbags, loading, error, reload: loadProducts } = useHandbags();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // Tải danh sách túi (dùng lại được cho nút "Try again")
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await getHandbags();
-      if (!mountedRef.current) return;
-
-      setHandbags(
-        data
-          .filter((item) => item && item.id !== undefined && item.id !== null)
-          .map((item) => ({
-            ...item,
-            id: String(item.id),
-            uri: item.uri || item.image || item.imageUrl || '',
-          }))
-      );
-    } catch {
-      if (mountedRef.current) {
-        setError('Could not load handbags. Check your connection and try again.');
-      }
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
 
   // Debounce: chỉ lọc sau khi người dùng ngừng gõ một chút
   useEffect(() => {
@@ -165,7 +125,7 @@ export default function SearchScreen({ navigation }) {
 
   // Dòng tóm tắt số kết quả
   const summary =
-    !loading && !error && handbags.length > 0 ? (
+    !loading && handbags.length > 0 ? (
       <Text style={styles.summary}>
         {searching
           ? `${results.length} ${results.length === 1 ? 'result' : 'results'} for “${debouncedQuery.trim()}”`
@@ -178,7 +138,7 @@ export default function SearchScreen({ navigation }) {
     emptyContent = (
       <ActivityIndicator size="large" color="#292725" style={styles.loader} />
     );
-  } else if (error) {
+  } else if (error && handbags.length === 0) {
     emptyContent = (
       <StateMessage
         icon="cloud-offline-outline"

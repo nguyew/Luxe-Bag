@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import RemoteImage from './RemoteImage';
 import { formatPercentOff, formatPrice } from '../utils/format';
 
 /**
@@ -13,7 +14,6 @@ import { formatPercentOff, formatPrice } from '../utils/format';
  *  - onRemove: gọi khi bấm nút xóa, nhận lại item
  */
 function FavoriteItem({ item, onOpen, onRemove }) {
-  const [imageFailed, setImageFailed] = useState(false);
   const discount = formatPercentOff(item.percentOff);
 
   return (
@@ -24,18 +24,7 @@ function FavoriteItem({ item, onOpen, onRemove }) {
       accessibilityLabel={`${item.handbagName}, open details`}
     >
       <View style={styles.thumb}>
-        {!imageFailed && item.uri ? (
-          <Image
-            source={{ uri: item.uri }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <View style={styles.thumbFallback}>
-            <Ionicons name="bag-outline" size={30} color="#FFFFFF" />
-          </View>
-        )}
+        <RemoteImage uri={item.uri} style={StyleSheet.absoluteFill} iconSize={30} />
 
         {typeof item.gender === 'boolean' && (
           <View

@@ -36,8 +36,7 @@
           "cameraPermission": "LuxeBag uses your camera so you can take a profile picture.",
           "microphonePermission": false
         }
-      ],
-      "expo-image"
+      ]
     ]
   }
 }
