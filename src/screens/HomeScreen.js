@@ -195,6 +195,16 @@ export default function HomeScreen({ navigation }) {
     <>
       <View style={styles.header}>
         <Pressable
+          onPress={() => navigation.navigate('Stylist')}
+          style={styles.headerButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Open AI Stylist"
+        >
+          <Ionicons name="sparkles-outline" size={24} color="#1A1A1A" />
+        </Pressable>
+
+        <Pressable
           onPress={() => navigation.navigate('Search')}
           style={styles.headerButton}
           hitSlop={8}
@@ -309,6 +319,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
+    gap: 6,
   },
 
   headerButton: {

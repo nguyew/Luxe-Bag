@@ -11,6 +11,7 @@ import FavoritesScreen from '../screens/FavouritesScreen';
 import CartScreen from '../screens/CartScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchScreen from '../screens/SearchScreen';
+import StylistScreen from '../screens/StylistScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -156,6 +157,17 @@ export default function AppNavigator() {
         component={SearchScreen}
         options={{
           title: 'Search',
+          headerTintColor: '#1A1A1A',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F3F1F1' },
+        }}
+      />
+
+      <Stack.Screen
+        name="Stylist"
+        component={StylistScreen}
+        options={{
+          title: 'AI Stylist',
           headerTintColor: '#1A1A1A',
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#F3F1F1' },
