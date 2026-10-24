@@ -14,7 +14,10 @@ import SearchScreen from '../screens/SearchScreen';
 import StylistScreen from '../screens/StylistScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
-import AdminHomeScreen from '../screens/AdminHomeScreen';
+import AdminTabs from './AdminTabs';
+import AdminProductFormScreen from '../screens/AdminProductFormScreen';
+import AdminOrderDetailScreen from '../screens/AdminOrderDetailScreen';
+import AdminCustomerDetailScreen from '../screens/AdminCustomerDetailScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import AddressesScreen from '../screens/AddressesScreen';
 import AddressFormScreen from '../screens/AddressFormScreen';
@@ -174,7 +177,7 @@ const detailHeader = {
  * Điều hướng theo trạng thái đăng nhập (cách React Navigation khuyến nghị:
  * chỉ khai báo những màn hình mà người dùng hiện tại được phép vào).
  *  - Khách / khách hàng: tabs + Search + Stylist + Detail (khách duyệt hàng tự do).
- *  - Admin: chỉ có khu quản trị.
+ *  - Admin: chỉ có khu quản trị (4 tab + form sản phẩm, chi tiết đơn, chi tiết khách).
  *  - Khách chưa đăng nhập: thêm Login / Register (dạng modal).
  * Đăng nhập xong màn Login tự biến mất và giao diện đổi theo role.
  */
@@ -193,11 +196,31 @@ export default function AppNavigator() {
   return (
     <Stack.Navigator>
       {isAdmin ? (
-        <Stack.Screen
-          name="AdminHome"
-          component={AdminHomeScreen}
-          options={{ headerShown: false }}
-        />
+        <>
+          <Stack.Screen
+            name="AdminTabs"
+            component={AdminTabs}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AdminProductForm"
+            component={AdminProductFormScreen}
+            options={({ route }) => ({
+              title: route.params?.handbagId ? 'Edit Product' : 'New Product',
+              ...detailHeader,
+            })}
+          />
+          <Stack.Screen
+            name="AdminOrderDetail"
+            component={AdminOrderDetailScreen}
+            options={{ title: 'Order', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="AdminCustomerDetail"
+            component={AdminCustomerDetailScreen}
+            options={{ title: 'Customer', ...detailHeader }}
+          />
+        </>
       ) : (
         <>
           <Stack.Screen

@@ -41,6 +41,8 @@ export function describeOrderError(error) {
       return 'Some items are no longer available in the requested quantity. Please review your bag.';
     case 'not_found':
       return 'We could not find this order.';
+    case 'invalid_transition':
+      return 'This order status can no longer be changed that way. It may have been updated already.';
     case 'not_cancellable':
       return 'This order can no longer be cancelled because the store has already processed it.';
     case 'network':
@@ -82,6 +84,13 @@ async function restoreStock(entries) {
 }
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
+
+/** Hoàn lại tồn kho cho tất cả sản phẩm trong một đơn (dùng khi đơn bị hủy). */
+export async function restoreOrderStock(order) {
+  await restoreStock(
+    asArray(order?.items).map((item) => ({ id: item.handbagId, qty: item.qty }))
+  );
+}
 
 function sortNewestFirst(orders) {
   return [...orders].sort(
@@ -231,9 +240,7 @@ export async function cancelOrder(userId, orderId) {
       orders: orders.map((item, i) => (i === index ? updated : item)),
     });
 
-    await restoreStock(
-      asArray(order.items).map((item) => ({ id: item.handbagId, qty: item.qty }))
-    );
+    await restoreOrderStock(order);
     return updated;
   } catch (error) {
     if (error instanceof OrderError) throw error;

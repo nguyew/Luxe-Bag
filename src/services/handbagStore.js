@@ -147,6 +147,31 @@ export function refresh({ force = false } = {}) {
 
 export const reload = () => refresh({ force: true });
 
+/**
+ * Cập nhật kho NGAY (không chờ tải lại) sau khi admin thêm/sửa một túi,
+ * để mọi màn hình thấy thay đổi tức thì.
+ */
+export function upsertHandbag(record) {
+  const [normalized] = normalizeHandbags([record]);
+  if (!normalized) return;
+
+  const exists = state.items.some((item) => String(item.id) === String(normalized.id));
+  const items = exists
+    ? state.items.map((item) => (String(item.id) === String(normalized.id) ? normalized : item))
+    : [...state.items, normalized];
+  const updatedAt = Date.now();
+  setState({ items, updatedAt, loading: false });
+  persist(items, updatedAt);
+}
+
+/** Bỏ một túi khỏi kho ngay sau khi admin xóa. */
+export function removeHandbag(id) {
+  const items = state.items.filter((item) => String(item.id) !== String(id));
+  const updatedAt = Date.now();
+  setState({ items, updatedAt });
+  persist(items, updatedAt);
+}
+
 // Hàm cố định (không đổi giữa các lần render) để dùng an toàn trong useFocusEffect
 export const revalidate = () => refresh();
 
