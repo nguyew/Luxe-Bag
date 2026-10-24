@@ -1,30 +1,63 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackSection from '../components/FeedbackSection';
 import RemoteImage from '../components/RemoteImage';
 import StarRating from '../components/StarRating';
+import useAuth from '../hooks/useAuth';
+import useCart from '../hooks/useCart';
 import useFavorites from '../hooks/useFavorites';
 import { useHandbag } from '../hooks/useHandbags';
 import { formatPercentOff, formatPrice } from '../utils/format';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
+import { getStock, isPurchasable } from '../utils/catalog';
+import { tapLight } from '../utils/haptics';
 
 const BAR_HEIGHT = 56;
 
-export default function DetailScreen({ route }) {
+export default function DetailScreen({ route, navigation }) {
   // Dữ liệu truyền qua route hiện ngay; bản mới nhất trong kho (ví dụ feedback
   // vừa thêm) sẽ tự thay thế khi có.
   const param = route.params?.handbag;
   const handbag = useHandbag(param?.id, param);
   const insets = useSafeAreaInsets();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { isLoggedIn } = useAuth();
+  const { add } = useCart();
+
+  // Nút "Add to bag" đổi chữ vài giây để báo kết quả
+  const [notice, setNotice] = useState(null);
+  const noticeTimer = useRef(null);
+  useEffect(() => () => clearTimeout(noticeTimer.current), []);
 
   // Điểm trung bình hiển thị ngay dưới tên túi
   const summary = useMemo(
     () => summarizeFeedbacks(normalizeFeedbacks(handbag?.feedbacks)),
     [handbag]
   );
+
+  const flash = useCallback((message) => {
+    setNotice(message);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 1800);
+  }, []);
+
+  const onAddToBag = useCallback(() => {
+    if (!isLoggedIn) {
+      navigation.navigate('Login'); // cần tài khoản để mua hàng
+      return;
+    }
+    const result = add(handbag, 1);
+    if (result.ok) {
+      tapLight();
+      flash('Added to your bag');
+    } else if (result.reason === 'limit') {
+      flash('Maximum quantity in bag');
+    } else {
+      flash('Out of stock');
+    }
+  }, [isLoggedIn, navigation, add, handbag, flash]);
 
   if (!handbag) {
     return (
@@ -44,6 +77,13 @@ export default function DetailScreen({ route }) {
     ? [handbag.color]
     : [];
   const hasGender = typeof handbag.gender === 'boolean';
+  const stock = getStock(handbag);
+  const purchasable = isPurchasable(handbag);
+  const stockLabel = !purchasable
+    ? 'Out of stock'
+    : stock !== null && stock <= 5
+    ? `Only ${stock} left`
+    : null;
 
   return (
     <View style={styles.screen}>
@@ -109,6 +149,13 @@ export default function DetailScreen({ route }) {
 
         <View style={styles.priceRow}>
           <Text style={styles.price}>{formatPrice(handbag.cost)}</Text>
+          {!!stockLabel && (
+            <View style={[styles.stockPill, !purchasable && styles.stockPillOut]}>
+              <Text style={[styles.stockText, !purchasable && styles.stockTextOut]}>
+                {stockLabel}
+              </Text>
+            </View>
+          )}
           {!!discount && (
             <View style={styles.discountPill}>
               <Text style={styles.discountText}>{discount} off</Text>
@@ -168,7 +215,7 @@ export default function DetailScreen({ route }) {
         <FeedbackSection feedbacks={handbag.feedbacks} />
       </ScrollView>
 
-      {/* Thanh thêm/bỏ yêu thích cố định ở đáy */}
+      {/* Thanh cố định ở đáy: yêu thích + thêm vào giỏ */}
       <View
         style={[
           styles.bottomBar,
@@ -179,16 +226,25 @@ export default function DetailScreen({ route }) {
           onPress={() => toggleFavorite(handbag)}
           style={[styles.favoriteButton, favorite && styles.favoriteButtonOn]}
           accessibilityRole="button"
+          accessibilityLabel={favorite ? 'Remove from favorites' : 'Add to favorites'}
         >
           <Ionicons
             name={favorite ? 'heart' : 'heart-outline'}
-            size={20}
-            color={favorite ? '#1A1A1A' : '#FFFFFF'}
+            size={22}
+            color={favorite ? '#FF4D5E' : '#1A1A1A'}
           />
-          <Text
-            style={[styles.favoriteText, favorite && styles.favoriteTextOn]}
-          >
-            {favorite ? 'Remove from favorites' : 'Add to favorites'}
+        </Pressable>
+
+        <Pressable
+          onPress={onAddToBag}
+          disabled={!purchasable}
+          style={[styles.bagButton, !purchasable && styles.bagButtonDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel="Add to bag"
+        >
+          <Ionicons name="bag-add-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.bagText}>
+            {notice || (purchasable ? 'Add to bag' : 'Out of stock')}
           </Text>
         </Pressable>
       </View>
@@ -350,11 +406,27 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 20,
     paddingTop: 12,
+    flexDirection: 'row',
+    gap: 10,
     backgroundColor: '#F3F1F1',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E4DFDA',
   },
   favoriteButton: {
+    width: BAR_HEIGHT - 8,
+    height: BAR_HEIGHT - 8,
+    borderRadius: (BAR_HEIGHT - 8) / 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E4DFDA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favoriteButtonOn: {
+    borderColor: '#FF4D5E',
+  },
+  bagButton: {
+    flex: 1,
     height: BAR_HEIGHT - 8,
     borderRadius: (BAR_HEIGHT - 8) / 2,
     backgroundColor: '#050505',
@@ -363,18 +435,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  favoriteButtonOn: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#050505',
+  bagButtonDisabled: {
+    backgroundColor: '#B9B2AA',
   },
-  favoriteText: {
+  bagText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  favoriteTextOn: {
-    color: '#1A1A1A',
+
+  // Nhãn tồn kho cạnh giá
+  stockPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#FFF1D6',
+  },
+  stockPillOut: {
+    backgroundColor: '#FBE3E1',
+  },
+  stockText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8A5A00',
+  },
+  stockTextOut: {
+    color: '#B3261E',
   },
 
   // Không có dữ liệu
