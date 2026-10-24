@@ -11,11 +11,13 @@ import {
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import OrderTimeline from '../components/OrderTimeline';
 import RemoteImage from '../components/RemoteImage';
+import TextPromptModal from '../components/TextPromptModal';
 import useHandbags from '../hooks/useHandbags';
-import { fetchAdminUsers, updateOrderStatus } from '../services/adminService';
+import { fetchAdminUsers, resolveReturn, updateOrderStatus } from '../services/adminService';
 import { describeOrderError } from '../services/orderService';
 import { formatPrice } from '../utils/format';
 import {
+  RETURN_STATUS,
   STATUS_ACTION_LABEL,
   formatOrderDate,
   nextStatuses,
@@ -27,6 +29,8 @@ export default function AdminOrderDetailScreen({ route }) {
   const { reload } = useHandbags();
   const [order, setOrder] = useState(route.params.order);
   const [busy, setBusy] = useState(null); // trạng thái đang chuyển tới
+  const [returnBusy, setReturnBusy] = useState(null); // 'approve' | 'reject'
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   const items = Array.isArray(order.items) ? order.items : [];
   const actions = nextStatuses(order.status);
@@ -59,6 +63,35 @@ export default function AdminOrderDetailScreen({ route }) {
     },
     [order.userId, order.id, reload, refreshOrder]
   );
+
+  const resolve = useCallback(
+    async (decision, options) => {
+      setReturnBusy(decision);
+      try {
+        const updated = await resolveReturn(order.userId, order.id, decision, options);
+        setOrder((current) => ({ ...current, ...updated }));
+        if (decision === 'approve' && options?.restock) reload(); // kho đã được cộng lại
+      } catch (error) {
+        Alert.alert('Return', describeOrderError(error));
+        if (error?.code === 'invalid_return') refreshOrder();
+      } finally {
+        setReturnBusy(null);
+      }
+    },
+    [order.userId, order.id, reload, refreshOrder]
+  );
+
+  const confirmApprove = () => {
+    Alert.alert(
+      'Approve this return?',
+      'The customer is refunded. Put the items back into stock only if they can be sold again.',
+      [
+        { text: 'Back', style: 'cancel' },
+        { text: 'Approve, don’t restock', onPress: () => resolve('approve', { restock: false }) },
+        { text: 'Approve & restock', onPress: () => resolve('approve', { restock: true }) },
+      ]
+    );
+  };
 
   const confirmChange = (nextStatus) => {
     const cancelling = nextStatus === 'cancelled';
@@ -124,6 +157,73 @@ export default function AdminOrderDetailScreen({ route }) {
         </View>
       )}
 
+      {!!order.returnRequest && (
+        <>
+          <Text style={styles.section}>Return request</Text>
+          <View style={styles.card}>
+            <View
+              style={[
+                styles.returnBadge,
+                { backgroundColor: (RETURN_STATUS[order.returnRequest.status] || RETURN_STATUS.requested).bg },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.returnBadgeText,
+                  { color: (RETURN_STATUS[order.returnRequest.status] || RETURN_STATUS.requested).color },
+                ]}
+              >
+                {(RETURN_STATUS[order.returnRequest.status] || RETURN_STATUS.requested).label}
+              </Text>
+            </View>
+            <Text style={styles.strong}>{order.returnRequest.reason}</Text>
+            {!!order.returnRequest.note && <Text style={styles.line}>{order.returnRequest.note}</Text>}
+            {!!order.returnRequest.requestedAt && (
+              <Text style={styles.returnMeta}>
+                Requested {formatOrderDate(order.returnRequest.requestedAt)}
+              </Text>
+            )}
+            {order.returnRequest.status === 'approved' && (
+              <Text style={styles.returnMeta}>
+                Refunded{order.returnRequest.restocked ? ' · items returned to stock' : ' · items not restocked'}
+              </Text>
+            )}
+            {order.returnRequest.status === 'rejected' && !!order.returnRequest.adminNote && (
+              <Text style={styles.returnMeta}>Note to customer: {order.returnRequest.adminNote}</Text>
+            )}
+
+            {order.returnRequest.status === 'requested' && (
+              <View style={styles.returnActions}>
+                <Pressable
+                  onPress={confirmApprove}
+                  disabled={returnBusy !== null}
+                  style={[styles.action, styles.actionPrimary, returnBusy !== null && styles.actionBusy]}
+                  accessibilityRole="button"
+                >
+                  {returnBusy === 'approve' ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.actionText}>Approve & refund</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => setRejectOpen(true)}
+                  disabled={returnBusy !== null}
+                  style={[styles.action, styles.actionCancel, returnBusy !== null && styles.actionBusy]}
+                  accessibilityRole="button"
+                >
+                  {returnBusy === 'reject' ? (
+                    <ActivityIndicator color="#B3261E" />
+                  ) : (
+                    <Text style={[styles.actionText, styles.actionTextCancel]}>Reject</Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </>
+      )}
+
       <Text style={styles.section}>Customer</Text>
       <View style={styles.card}>
         <Text style={styles.strong}>{order.customerName}</Text>
@@ -180,6 +280,14 @@ export default function AdminOrderDetailScreen({ route }) {
           <Text style={styles.muted}>Subtotal</Text>
           <Text style={styles.value}>{formatPrice(order.subtotal)}</Text>
         </View>
+        {order.discount > 0 && (
+          <View style={styles.payRow}>
+            <Text style={styles.muted}>
+              Discount{order.couponCode ? ` (${order.couponCode})` : ''}
+            </Text>
+            <Text style={[styles.value, styles.discountValue]}>-{formatPrice(order.discount)}</Text>
+          </View>
+        )}
         <View style={styles.payRow}>
           <Text style={styles.muted}>Shipping</Text>
           <Text style={styles.value}>
@@ -191,11 +299,38 @@ export default function AdminOrderDetailScreen({ route }) {
           <Text style={styles.totalValue}>{formatPrice(order.total)}</Text>
         </View>
       </View>
+
+      <TextPromptModal
+        visible={rejectOpen}
+        title="Reject return"
+        message="Tell the customer why (optional)."
+        placeholder="e.g. The item shows signs of use"
+        confirmLabel="Reject"
+        multiline
+        maxLength={300}
+        onSubmit={(note) => {
+          setRejectOpen(false);
+          resolve('reject', { note });
+        }}
+        onCancel={() => setRejectOpen(false)}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  discountValue: { color: '#1F7A3E' },
+  returnBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  returnBadgeText: { fontSize: 12, fontWeight: '700' },
+  returnMeta: { marginTop: 8, fontSize: 12, lineHeight: 17, color: '#77716A' },
+  returnActions: { gap: 10, marginTop: 16 },
   screen: { flex: 1, backgroundColor: '#F3F1F1' },
   content: { padding: 16, paddingBottom: 48 },
   section: {

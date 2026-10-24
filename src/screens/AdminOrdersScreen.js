@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,16 +16,23 @@ import FilterChips from '../components/FilterChips';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import SearchBox from '../components/SearchBox';
 import useAdminUsers from '../hooks/useAdminUsers';
-import { flattenOrders, orderCountsByStatus } from '../utils/admin';
+import { flattenOrders, orderCountsByStatus, returnRequestCount } from '../utils/admin';
 import { formatPrice } from '../utils/format';
-import { ORDER_STATUS, formatOrderDate } from '../utils/orders';
+import { ORDER_STATUS, formatOrderDate, hasOpenReturn } from '../utils/orders';
 
 /** Tất cả đơn hàng của mọi khách: tìm theo mã/khách, lọc theo trạng thái. */
-export default function AdminOrdersScreen({ navigation }) {
+export default function AdminOrdersScreen({ navigation, route }) {
   const { users, loading, error, reload } = useAdminUsers();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [pulling, setPulling] = useState(false);
+
+  // Dashboard có thể mở sẵn một bộ lọc (ví dụ "Return requests")
+  const requestedFilter = route?.params?.filter;
+  const requestedAt = route?.params?.t;
+  useEffect(() => {
+    if (requestedFilter) setFilter(requestedFilter);
+  }, [requestedFilter, requestedAt]);
 
   const orders = useMemo(() => (users ? flattenOrders(users) : []), [users]);
   const counts = useMemo(() => orderCountsByStatus(orders), [orders]);
@@ -33,19 +40,24 @@ export default function AdminOrdersScreen({ navigation }) {
   const options = useMemo(
     () => [
       { key: 'all', label: 'All', count: counts.all },
+      { key: 'returns', label: 'Return requests', count: returnRequestCount(orders) },
       ...Object.keys(ORDER_STATUS).map((key) => ({
         key,
         label: ORDER_STATUS[key].label,
         count: counts[key] || 0,
       })),
     ],
-    [counts]
+    [counts, orders]
   );
 
   const data = useMemo(() => {
     const text = query.trim().toLowerCase();
     return orders
-      .filter((order) => filter === 'all' || order.status === filter)
+      .filter((order) => {
+        if (filter === 'all') return true;
+        if (filter === 'returns') return hasOpenReturn(order);
+        return order.status === filter;
+      })
       .filter(
         (order) =>
           !text ||
@@ -136,6 +148,11 @@ const OrderRow = React.memo(function OrderRow({ order, onPress }) {
         </View>
         <OrderStatusBadge status={order.status} />
       </View>
+      {hasOpenReturn(order) && (
+        <View style={styles.returnTag}>
+          <Text style={styles.returnTagText}>Return requested</Text>
+        </View>
+      )}
       <View style={styles.bottom}>
         <Text style={styles.count}>
           {count} {count === 1 ? 'item' : 'items'} ·{' '}
@@ -148,6 +165,16 @@ const OrderRow = React.memo(function OrderRow({ order, onPress }) {
 });
 
 const styles = StyleSheet.create({
+  returnTag: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 10,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF1D6',
+    justifyContent: 'center',
+  },
+  returnTagText: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   safeArea: { flex: 1, backgroundColor: '#F3F1F1' },
   list: { paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 },
   center: { alignItems: 'center', justifyContent: 'center', paddingVertical: 56 },

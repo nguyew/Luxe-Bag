@@ -55,7 +55,8 @@ export function toPublicUser(record) {
     id: String(record.id),
     name: String(record.name || ''),
     email: normalizeEmail(record.email),
-    role: record.role === 'admin' ? 'admin' : 'customer',
+    // 'system' = bản ghi nội bộ (mã giảm giá), không phải tài khoản đăng nhập
+    role: record.role === 'admin' ? 'admin' : record.role === 'system' ? 'system' : 'customer',
     status: record.status === 'disabled' ? 'disabled' : 'active',
     phone: String(record.phone || ''),
     createdAt: record.createdAt || null,

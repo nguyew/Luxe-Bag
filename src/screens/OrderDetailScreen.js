@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import OrderTimeline from '../components/OrderTimeline';
 import RemoteImage from '../components/RemoteImage';
@@ -16,10 +17,17 @@ import useAuth from '../hooks/useAuth';
 import useHandbags from '../hooks/useHandbags';
 import { cancelOrder, describeOrderError, getMyOrders } from '../services/orderService';
 import { formatPrice } from '../utils/format';
-import { canCancel, formatOrderDate, paymentLabel } from '../utils/orders';
+import {
+  RETURN_STATUS,
+  canCancel,
+  canRequestReturn,
+  formatOrderDate,
+  paymentLabel,
+  returnDeadline,
+} from '../utils/orders';
 
 /** Chi tiết một đơn: trạng thái, sản phẩm, địa chỉ, thanh toán, nút hủy đơn. */
-export default function OrderDetailScreen({ route }) {
+export default function OrderDetailScreen({ navigation, route }) {
   const { orderId, placed } = route.params || {};
   const { user } = useAuth();
   const { reload } = useHandbags();
@@ -46,9 +54,12 @@ export default function OrderDetailScreen({ route }) {
     }
   }, [userId, orderId]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  // Tải lại mỗi lần màn hình được focus (ví dụ vừa gửi yêu cầu trả hàng, hoặc cửa hàng vừa xử lý)
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   const doCancel = useCallback(async () => {
     if (!userId || !order) return;
@@ -159,6 +170,14 @@ export default function OrderDetailScreen({ route }) {
           <Text style={styles.muted}>Subtotal</Text>
           <Text style={styles.value}>{formatPrice(order.subtotal)}</Text>
         </View>
+        {order.discount > 0 && (
+          <View style={styles.payRow}>
+            <Text style={styles.muted}>
+              Discount{order.couponCode ? ` (${order.couponCode})` : ''}
+            </Text>
+            <Text style={[styles.value, styles.discountValue]}>-{formatPrice(order.discount)}</Text>
+          </View>
+        )}
         <View style={styles.payRow}>
           <Text style={styles.muted}>Shipping</Text>
           <Text style={styles.value}>
@@ -170,6 +189,56 @@ export default function OrderDetailScreen({ route }) {
           <Text style={styles.totalValue}>{formatPrice(order.total)}</Text>
         </View>
       </View>
+
+      {/* Trả hàng */}
+      {!!order.returnRequest && (
+        <>
+          <Text style={styles.section}>Return</Text>
+          <View style={styles.card}>
+            <View
+              style={[
+                styles.returnBadge,
+                { backgroundColor: (RETURN_STATUS[order.returnRequest.status] || RETURN_STATUS.requested).bg },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.returnBadgeText,
+                  { color: (RETURN_STATUS[order.returnRequest.status] || RETURN_STATUS.requested).color },
+                ]}
+              >
+                {(RETURN_STATUS[order.returnRequest.status] || RETURN_STATUS.requested).label}
+              </Text>
+            </View>
+            <Text style={styles.returnReason}>{order.returnRequest.reason}</Text>
+            {!!order.returnRequest.note && <Text style={styles.line}>{order.returnRequest.note}</Text>}
+            {order.returnRequest.status === 'approved' && (
+              <Text style={styles.line}>Your refund has been approved.</Text>
+            )}
+            {order.returnRequest.status === 'rejected' && !!order.returnRequest.adminNote && (
+              <Text style={styles.rejectNote}>Store note: {order.returnRequest.adminNote}</Text>
+            )}
+          </View>
+        </>
+      )}
+
+      {canRequestReturn(order) && (
+        <>
+          <Pressable
+            onPress={() => navigation.navigate('ReturnRequest', { order })}
+            style={styles.returnButton}
+            accessibilityRole="button"
+          >
+            <Ionicons name="return-up-back-outline" size={18} color="#1A1A1A" />
+            <Text style={styles.returnButtonText}>Request a return</Text>
+          </Pressable>
+          {returnDeadline(order) !== null && (
+            <Text style={styles.returnHint}>
+              Available until {formatOrderDate(new Date(returnDeadline(order)).toISOString())}
+            </Text>
+          )}
+        </>
+      )}
 
       {canCancel(order) && (
         <Pressable
@@ -196,6 +265,30 @@ function paymentStatusText(status) {
 }
 
 const styles = StyleSheet.create({
+  discountValue: { color: '#1F7A3E' },
+  returnBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  returnBadgeText: { fontSize: 12, fontWeight: '700' },
+  returnReason: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
+  rejectNote: { marginTop: 8, fontSize: 13, lineHeight: 18, color: '#B3261E' },
+  returnButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    marginTop: 24,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+  },
+  returnButtonText: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
+  returnHint: { marginTop: 8, textAlign: 'center', fontSize: 12, color: '#77716A' },
   screen: { flex: 1, backgroundColor: '#F3F1F1' },
   center: { alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 48 },

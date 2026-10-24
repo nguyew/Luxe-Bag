@@ -1,14 +1,132 @@
 [
   {
     "name": "Store Admin",
-    "email": "admin@example.com",
-    "passwordHash": "",
-    "salt": "",
+    "email": "admin@luxebag.com",
     "role": "admin",
     "status": "active",
-    "phone": "",
-    "createdAt": "",
+    "phone": "0900000001",
+    "createdAt": "2026-10-01T08:00:00.000Z",
     "addresses": [],
-    "orders": []
+    "orders": [],
+    "promotion": [],
+    "salt": "ee934f13-19d7-4719-b9f5-5526357e685f",
+    "passwordHash": "e775789c3f5b212118bfc9053090b48488265c9c63220ce9e72ce08f7d477cb4"
+  },
+  {
+    "name": "Nguyen Minh Anh",
+    "email": "minhanh@example.com",
+    "role": "customer",
+    "status": "active",
+    "phone": "0900000002",
+    "createdAt": "2026-10-02T09:15:00.000Z",
+    "addresses": [],
+    "orders": [],
+    "promotion": [
+      {
+        "id": "PROMO_WELCOME10",
+        "code": "WELCOME10",
+        "title": "Welcome Offer",
+        "description": "Get 10% off your first order.",
+        "discountType": "percentage",
+        "discountValue": 10,
+        "minOrderValue": 500000,
+        "status": "active",
+        "startDate": "2026-01-01T00:00:00.000Z",
+        "endDate": "2027-12-31T23:59:59.000Z"
+      }
+    ],
+    "salt": "6e434b3c-e82d-482d-9f55-13fa8496ce62",
+    "passwordHash": "2582c97d205625ab73f26340692889f3bf14fa5b9182d5c867423529c58f2b06"
+  },
+  {
+    "name": "Tran Gia Han",
+    "email": "giahan@example.com",
+    "role": "customer",
+    "status": "active",
+    "phone": "0900000003",
+    "createdAt": "2026-10-03T10:30:00.000Z",
+    "addresses": [],
+    "orders": [],
+    "promotion": [
+      {
+        "id": "PROMO_FREESHIP",
+        "code": "FREESHIP",
+        "title": "Free Shipping",
+        "description": "Free shipping on orders over 300,000 VND.",
+        "discountType": "fixed",
+        "discountValue": 30000,
+        "minOrderValue": 300000,
+        "status": "active",
+        "startDate": "2026-01-01T00:00:00.000Z",
+        "endDate": "2027-12-31T23:59:59.000Z"
+      }
+    ],
+    "salt": "18e7deda-1eee-4d94-a0d8-cc63a8375d16",
+    "passwordHash": "5215531d057a3fe034e2e022cdb061a81bfe030a648b685b5bc818a783fadee5"
+  },
+  {
+    "name": "Le Quoc Bao",
+    "email": "quocbao@example.com",
+    "role": "customer",
+    "status": "active",
+    "phone": "0900000004",
+    "createdAt": "2026-10-04T11:45:00.000Z",
+    "addresses": [],
+    "orders": [],
+    "promotion": [
+      {
+        "id": "PROMO_MEMBER15",
+        "code": "MEMBER15",
+        "title": "Member Exclusive",
+        "description": "Enjoy 15% off selected handbags.",
+        "discountType": "percentage",
+        "discountValue": 15,
+        "minOrderValue": 800000,
+        "status": "active",
+        "startDate": "2026-02-01T00:00:00.000Z",
+        "endDate": "2027-12-31T23:59:59.000Z"
+      }
+    ],
+    "salt": "1fe308b4-653b-4ee2-89d4-35e9982ee5a4",
+    "passwordHash": "2c1b25afd58098958fb832f8202a2695b01ff1fbe3f1663f06f786ef2e1a1b34"
+  },
+  {
+    "name": "Pham Thu Ha",
+    "email": "thuha@example.com",
+    "role": "customer",
+    "status": "active",
+    "phone": "0900000005",
+    "createdAt": "2026-10-05T13:20:00.000Z",
+    "addresses": [],
+    "orders": [],
+    "promotion": [
+      {
+        "id": "PROMO_BAG20",
+        "code": "BAG20",
+        "title": "Handbag Special",
+        "description": "Save 20% on selected handbag collections.",
+        "discountType": "percentage",
+        "discountValue": 20,
+        "minOrderValue": 1000000,
+        "status": "active",
+        "startDate": "2026-03-01T00:00:00.000Z",
+        "endDate": "2027-12-31T23:59:59.000Z"
+      }
+    ],
+    "salt": "5c6bf1a4-cfbc-4ca8-8f1b-bbadcc6a9430",
+    "passwordHash": "4fbfd02e316f5703589b3cf69159bf53501a32219da9b79b27ed884fef0d7455"
+  },
+  {
+    "name": "Do Thanh Tung",
+    "email": "thanhtung@example.com",
+    "role": "customer",
+    "status": "active",
+    "phone": "0900000006",
+    "createdAt": "2026-10-06T14:10:00.000Z",
+    "addresses": [],
+    "orders": [],
+    "promotion": [],
+    "salt": "24599e1f-93b5-490f-bcc5-22d6e14f7662",
+    "passwordHash": "1d124c2c30685e7c945b7aade819aec2b6616c6307811482082edc008ae63c68"
   }
 ]

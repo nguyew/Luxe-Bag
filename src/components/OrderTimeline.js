@@ -21,6 +21,17 @@ export default function OrderTimeline({ order }) {
     );
   }
 
+  if (order.status === 'returned') {
+    return (
+      <View style={styles.returnedBox}>
+        <Ionicons name="return-up-back-outline" size={18} color="#55514C" />
+        <Text style={styles.returnedText}>
+          Returned and refunded{order.returnedAt ? ` on ${formatOrderDate(order.returnedAt)}` : ''}
+        </Text>
+      </View>
+    );
+  }
+
   const current = ORDER_FLOW.indexOf(order.status);
   return (
     <View style={styles.timeline}>
@@ -51,6 +62,16 @@ export default function OrderTimeline({ order }) {
 }
 
 const styles = StyleSheet.create({
+  returnedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    marginTop: 14,
+    borderRadius: 14,
+    backgroundColor: '#E7E3DF',
+  },
+  returnedText: { fontSize: 13, fontWeight: '600', color: '#55514C' },
   timeline: { marginTop: 18 },
   step: { flexDirection: 'row', gap: 12 },
   dotCol: { alignItems: 'center', width: 20 },
