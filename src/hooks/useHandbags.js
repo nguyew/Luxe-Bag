@@ -6,10 +6,13 @@ import {
   revalidate,
   subscribe,
 } from '../services/handbagStore';
+import { isPublished } from '../utils/catalog';
 
 /**
  * Danh sách túi xách dùng chung.
- * Trả về { items, loading, refreshing, error, reload, revalidate }:
+ * Trả về { items, allItems, loading, refreshing, error, reload, revalidate }:
+ *  - items:      chỉ các túi ĐÃ XUẤT BẢN (dùng cho khách hàng: Home, Search...)
+ *  - allItems:   tất cả, kể cả bản nháp/lưu trữ (dùng cho Detail, giỏ hàng, admin)
  *  - loading:    đang tải và chưa có dữ liệu để hiển thị
  *  - refreshing: đang tải lại ngầm (vẫn có dữ liệu cũ)
  *  - error:      thông báo lỗi (có thể vẫn kèm dữ liệu cũ -> chế độ offline)
@@ -23,18 +26,27 @@ export default function useHandbags() {
     ensureLoaded();
   }, []);
 
-  return useMemo(() => ({ ...snapshot, reload, revalidate }), [snapshot]);
+  return useMemo(
+    () => ({
+      ...snapshot,
+      items: snapshot.items.filter(isPublished),
+      allItems: snapshot.items,
+      reload,
+      revalidate,
+    }),
+    [snapshot]
+  );
 }
 
 /**
- * Bản MỚI NHẤT của một túi theo id (ví dụ feedback vừa được thêm trên API).
+ * Bản MỚI NHẤT của một túi theo id (ví dụ feedback/tồn kho vừa đổi trên API).
  * Chưa có trong kho thì dùng `fallback` (đối tượng truyền qua route).
  */
 export function useHandbag(id, fallback) {
-  const { items } = useHandbags();
+  const { allItems } = useHandbags();
 
   return useMemo(
-    () => items.find((item) => String(item.id) === String(id)) || fallback,
-    [items, id, fallback]
+    () => allItems.find((item) => String(item.id) === String(id)) || fallback,
+    [allItems, id, fallback]
   );
 }

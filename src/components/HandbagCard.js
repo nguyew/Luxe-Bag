@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemoteImage from './RemoteImage';
 import { formatPercentOff, formatPrice } from '../utils/format';
+import { isPurchasable } from '../utils/catalog';
 
 /**
  * Thẻ túi xách dùng chung (Home, Favorites, Search).
@@ -76,6 +77,13 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
             size={16}
             color="#FFFFFF"
           />
+        </View>
+      )}
+
+      {/* Hết hàng */}
+      {!isPurchasable(item) && (
+        <View style={styles.soldOutPill}>
+          <Text style={styles.soldOutText}>Sold out</Text>
         </View>
       )}
 
@@ -261,6 +269,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#B3261E',
+  },
+
+  // Nhãn hết hàng (cạnh huy hiệu gender)
+  soldOutPill: {
+    position: 'absolute',
+    left: 50,
+    top: 16,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  soldOutText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 
   // Mô tả trên thẻ rộng

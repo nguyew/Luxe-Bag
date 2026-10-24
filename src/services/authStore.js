@@ -7,15 +7,17 @@
  *    hóa hoặc bị xóa -> tự đăng xuất; đổi role -> giao diện đổi theo.
  *    Mất mạng thì giữ nguyên phiên đã lưu.
  *  - Đổi tài khoản thì đổi luôn kho "yêu thích" và hồ sơ ảnh đại diện
- *    (mỗi tài khoản một bản riêng) TRƯỚC khi báo cho các màn hình.
+ *    và giỏ hàng (mỗi tài khoản một bản riêng) TRƯỚC khi báo cho các màn hình.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getUserById,
   loginUser,
   registerUser,
+  setUserAddresses,
   updateUser,
 } from './userService';
+import { setCartOwner } from './cartService';
 import { setFavoritesOwner } from './favoriteService';
 import { setProfileOwner } from './profileService';
 
@@ -57,7 +59,11 @@ async function saveSession(user) {
 // Đổi kho dữ liệu theo tài khoản trước, rồi mới công bố user mới
 async function applyUser(user) {
   const ownerId = user ? user.id : null;
-  await Promise.all([setFavoritesOwner(ownerId), setProfileOwner(ownerId)]);
+  await Promise.all([
+    setFavoritesOwner(ownerId),
+    setProfileOwner(ownerId),
+    setCartOwner(ownerId),
+  ]);
   setState({ user, status: 'ready' });
 }
 
@@ -124,6 +130,15 @@ export async function logout() {
 export async function updateAccount(patch) {
   if (!state.user) throw new Error('Not signed in.');
   const user = await updateUser(state.user.id, patch);
+  setState({ user });
+  saveSession(user);
+  return user;
+}
+
+/** Lưu danh sách địa chỉ giao hàng. Trả về user mới. */
+export async function saveAddresses(addresses) {
+  if (!state.user) throw new Error('Not signed in.');
+  const user = await setUserAddresses(state.user.id, addresses);
   setState({ user });
   saveSession(user);
   return user;

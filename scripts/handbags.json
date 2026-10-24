@@ -1,0 +1,695 @@
+[
+  {
+    "handbagName": "Classic Leather Tote",
+    "cost": 58,
+    "category": "Tote Bag",
+    "color": "Black",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Charles & Keith",
+    "percentOff": 2,
+    "feedbacks": [
+      {
+        "id": "1-1",
+        "author": "Mai Phuong",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-08-08T09:00:00.000Z"
+      },
+      {
+        "id": "1-2",
+        "author": "Olivia Park",
+        "rating": 5,
+        "comment": "Exactly as pictured, fast delivery and perfect packaging.",
+        "date": "2026-09-09T09:00:00.000Z"
+      },
+      {
+        "id": "1-3",
+        "author": "Thomas Reed",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-01-10T09:00:00.000Z"
+      },
+      {
+        "id": "1-4",
+        "author": "Linh Tran",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-02-11T09:00:00.000Z"
+      },
+      {
+        "id": "1-5",
+        "author": "Minh Anh",
+        "rating": 3,
+        "comment": "Looks good, though the hardware scratches easily.",
+        "date": "2026-03-12T09:00:00.000Z"
+      },
+      {
+        "id": "1-6",
+        "author": "Sophie Nguyen",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-04-13T09:00:00.000Z"
+      }
+    ],
+    "id": "1",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Mini Crossbody Bag",
+    "cost": 8,
+    "category": "Crossbody",
+    "color": "Beige",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "ALDO",
+    "percentOff": 96,
+    "feedbacks": [
+      {
+        "id": "2-1",
+        "author": "Hana Kim",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-06-15T09:00:00.000Z"
+      },
+      {
+        "id": "2-2",
+        "author": "Emily Carter",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-07-16T09:00:00.000Z"
+      },
+      {
+        "id": "2-3",
+        "author": "Quang Huy",
+        "rating": 3,
+        "comment": "Decent quality. Stitching on one corner was not perfect.",
+        "date": "2026-08-17T09:00:00.000Z"
+      },
+      {
+        "id": "2-4",
+        "author": "Mai Phuong",
+        "rating": 5,
+        "comment": "Exactly as pictured, fast delivery and perfect packaging.",
+        "date": "2026-09-18T09:00:00.000Z"
+      },
+      {
+        "id": "2-5",
+        "author": "Olivia Park",
+        "rating": 2,
+        "comment": "The finish had small marks when it arrived. Hoping for better at this price.",
+        "date": "2026-01-19T09:00:00.000Z"
+      }
+    ],
+    "id": "2",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Quilted Shoulder Bag",
+    "cost": 81,
+    "category": "Shoulder Bag",
+    "color": "Cream",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Michael Kors",
+    "percentOff": 38,
+    "feedbacks": [
+      {
+        "id": "3-1",
+        "author": "Minh Anh",
+        "rating": 5,
+        "comment": "Beautiful craftsmanship, the leather feels premium and it looks even better in person.",
+        "date": "2026-04-22T09:00:00.000Z"
+      },
+      {
+        "id": "3-2",
+        "author": "Sophie Nguyen",
+        "rating": 4,
+        "comment": "Great quality overall. Colour is slightly different from the photo but still gorgeous.",
+        "date": "2026-05-23T09:00:00.000Z"
+      },
+      {
+        "id": "3-3",
+        "author": "David Lee",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-06-24T09:00:00.000Z"
+      },
+      {
+        "id": "3-4",
+        "author": "Hana Kim",
+        "rating": 3,
+        "comment": "Nice design, but a bit smaller than I expected for the price.",
+        "date": "2026-07-25T09:00:00.000Z"
+      }
+    ],
+    "id": "3",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Elegant Chain Handbag",
+    "cost": 68,
+    "category": "Shoulder Bag",
+    "color": "Brown",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Charles & Keith",
+    "percentOff": 43,
+    "feedbacks": [
+      {
+        "id": "4-1",
+        "author": "Olivia Park",
+        "rating": 3,
+        "comment": "Decent quality. Stitching on one corner was not perfect.",
+        "date": "2026-02-02T09:00:00.000Z"
+      },
+      {
+        "id": "4-2",
+        "author": "Thomas Reed",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-03-03T09:00:00.000Z"
+      },
+      {
+        "id": "4-3",
+        "author": "Linh Tran",
+        "rating": 5,
+        "comment": "Beautiful craftsmanship, the leather feels premium and it looks even better in person.",
+        "date": "2026-04-04T09:00:00.000Z"
+      },
+      {
+        "id": "4-4",
+        "author": "Minh Anh",
+        "rating": 4,
+        "comment": "Great quality overall. Colour is slightly different from the photo but still gorgeous.",
+        "date": "2026-05-05T09:00:00.000Z"
+      },
+      {
+        "id": "4-5",
+        "author": "Sophie Nguyen",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-06-06T09:00:00.000Z"
+      },
+      {
+        "id": "4-6",
+        "author": "David Lee",
+        "rating": 2,
+        "comment": "Smaller than the photos suggest and the zipper feels stiff.",
+        "date": "2026-07-07T09:00:00.000Z"
+      }
+    ],
+    "id": "4",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Everyday Satchel",
+    "cost": 34,
+    "category": "Satchel",
+    "color": "Tan",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Fossil",
+    "percentOff": 47,
+    "feedbacks": [
+      {
+        "id": "5-1",
+        "author": "Emily Carter",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-09-09T09:00:00.000Z"
+      },
+      {
+        "id": "5-2",
+        "author": "Quang Huy",
+        "rating": 5,
+        "comment": "Beautiful craftsmanship, the leather feels premium and it looks even better in person.",
+        "date": "2026-01-10T09:00:00.000Z"
+      },
+      {
+        "id": "5-3",
+        "author": "Mai Phuong",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-02-11T09:00:00.000Z"
+      },
+      {
+        "id": "5-4",
+        "author": "Olivia Park",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-03-12T09:00:00.000Z"
+      }
+    ],
+    "id": "5",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Minimalist Bucket Bag",
+    "cost": 54,
+    "category": "Bucket Bag",
+    "color": "Black",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "JW PEI",
+    "percentOff": 62,
+    "feedbacks": [
+      {
+        "id": "6-1",
+        "author": "Sophie Nguyen",
+        "rating": 5,
+        "comment": "Beautiful craftsmanship, the leather feels premium and it looks even better in person.",
+        "date": "2026-07-16T09:00:00.000Z"
+      },
+      {
+        "id": "6-2",
+        "author": "David Lee",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-08-17T09:00:00.000Z"
+      },
+      {
+        "id": "6-3",
+        "author": "Hana Kim",
+        "rating": 5,
+        "comment": "Exactly as pictured, fast delivery and perfect packaging.",
+        "date": "2026-09-18T09:00:00.000Z"
+      },
+      {
+        "id": "6-4",
+        "author": "Emily Carter",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-01-19T09:00:00.000Z"
+      },
+      {
+        "id": "6-5",
+        "author": "Quang Huy",
+        "rating": 3,
+        "comment": "Decent quality. Stitching on one corner was not perfect.",
+        "date": "2026-02-20T09:00:00.000Z"
+      }
+    ],
+    "id": "6",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Soft Hobo Bag",
+    "cost": 98,
+    "category": "Hobo Bag",
+    "color": "Taupe",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Coach",
+    "percentOff": 96,
+    "feedbacks": [
+      {
+        "id": "7-1",
+        "author": "Thomas Reed",
+        "rating": 4,
+        "comment": "Great quality overall. Colour is slightly different from the photo but still gorgeous.",
+        "date": "2026-05-23T09:00:00.000Z"
+      },
+      {
+        "id": "7-2",
+        "author": "Linh Tran",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-06-24T09:00:00.000Z"
+      },
+      {
+        "id": "7-3",
+        "author": "Minh Anh",
+        "rating": 5,
+        "comment": "Beautiful craftsmanship, the leather feels premium and it looks even better in person.",
+        "date": "2026-07-25T09:00:00.000Z"
+      },
+      {
+        "id": "7-4",
+        "author": "Sophie Nguyen",
+        "rating": 3,
+        "comment": "Decent quality. Stitching on one corner was not perfect.",
+        "date": "2026-08-26T09:00:00.000Z"
+      }
+    ],
+    "id": "7",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Structured Top Handle Bag",
+    "cost": 94,
+    "category": "Top Handle",
+    "color": "Burgundy",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Kate Spade",
+    "percentOff": 75,
+    "feedbacks": [
+      {
+        "id": "8-1",
+        "author": "Quang Huy",
+        "rating": 5,
+        "comment": "Exactly as pictured, fast delivery and perfect packaging.",
+        "date": "2026-03-03T09:00:00.000Z"
+      },
+      {
+        "id": "8-2",
+        "author": "Mai Phuong",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-04-04T09:00:00.000Z"
+      },
+      {
+        "id": "8-3",
+        "author": "Olivia Park",
+        "rating": 4,
+        "comment": "Great quality overall. Colour is slightly different from the photo but still gorgeous.",
+        "date": "2026-05-05T09:00:00.000Z"
+      },
+      {
+        "id": "8-4",
+        "author": "Thomas Reed",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-06-06T09:00:00.000Z"
+      },
+      {
+        "id": "8-5",
+        "author": "Linh Tran",
+        "rating": 2,
+        "comment": "The finish had small marks when it arrived. Hoping for better at this price.",
+        "date": "2026-07-07T09:00:00.000Z"
+      },
+      {
+        "id": "8-6",
+        "author": "Minh Anh",
+        "rating": 1,
+        "comment": "Arrived with a visible defect and the return took a while.",
+        "date": "2026-08-08T09:00:00.000Z"
+      }
+    ],
+    "id": "8",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Compact Evening Clutch",
+    "cost": 85,
+    "category": "Clutch",
+    "color": "Silver",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "ALDO",
+    "percentOff": 36,
+    "feedbacks": [
+      {
+        "id": "9-1",
+        "author": "David Lee",
+        "rating": 3,
+        "comment": "Nice design, but a bit smaller than I expected for the price.",
+        "date": "2026-01-10T09:00:00.000Z"
+      },
+      {
+        "id": "9-2",
+        "author": "Hana Kim",
+        "rating": 4,
+        "comment": "Great quality overall. Colour is slightly different from the photo but still gorgeous.",
+        "date": "2026-02-11T09:00:00.000Z"
+      },
+      {
+        "id": "9-3",
+        "author": "Emily Carter",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-03-12T09:00:00.000Z"
+      },
+      {
+        "id": "9-4",
+        "author": "Quang Huy",
+        "rating": 5,
+        "comment": "Beautiful craftsmanship, the leather feels premium and it looks even better in person.",
+        "date": "2026-04-13T09:00:00.000Z"
+      },
+      {
+        "id": "9-5",
+        "author": "Mai Phuong",
+        "rating": 4,
+        "comment": "Great quality overall. Colour is slightly different from the photo but still gorgeous.",
+        "date": "2026-05-14T09:00:00.000Z"
+      }
+    ],
+    "id": "9",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Casual Nylon Shoulder Bag",
+    "cost": 68,
+    "category": "Shoulder Bag",
+    "color": "Navy",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Longchamp",
+    "percentOff": 40,
+    "feedbacks": [
+      {
+        "id": "10-1",
+        "author": "Linh Tran",
+        "rating": 2,
+        "comment": "The finish had small marks when it arrived. Hoping for better at this price.",
+        "date": "2026-08-17T09:00:00.000Z"
+      },
+      {
+        "id": "10-2",
+        "author": "Minh Anh",
+        "rating": 3,
+        "comment": "Looks good, though the hardware scratches easily.",
+        "date": "2026-09-18T09:00:00.000Z"
+      },
+      {
+        "id": "10-3",
+        "author": "Sophie Nguyen",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-01-19T09:00:00.000Z"
+      },
+      {
+        "id": "10-4",
+        "author": "David Lee",
+        "rating": 3,
+        "comment": "Decent quality. Stitching on one corner was not perfect.",
+        "date": "2026-02-20T09:00:00.000Z"
+      }
+    ],
+    "id": "10",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Vintage Flap Bag",
+    "cost": 5,
+    "category": "Flap Bag",
+    "color": "Chocolate",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Guess",
+    "percentOff": 35,
+    "feedbacks": [
+      {
+        "id": "11-1",
+        "author": "Mai Phuong",
+        "rating": 5,
+        "comment": "Exactly as pictured, fast delivery and perfect packaging.",
+        "date": "2026-06-24T09:00:00.000Z"
+      },
+      {
+        "id": "11-2",
+        "author": "Olivia Park",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-07-25T09:00:00.000Z"
+      },
+      {
+        "id": "11-3",
+        "author": "Thomas Reed",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-08-26T09:00:00.000Z"
+      },
+      {
+        "id": "11-4",
+        "author": "Linh Tran",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-09-27T09:00:00.000Z"
+      },
+      {
+        "id": "11-5",
+        "author": "Minh Anh",
+        "rating": 5,
+        "comment": "Beautiful craftsmanship, the leather feels premium and it looks even better in person.",
+        "date": "2026-01-01T09:00:00.000Z"
+      }
+    ],
+    "id": "11",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Woven Crossbody Bag",
+    "cost": 64,
+    "category": "Crossbody",
+    "color": "Ivory",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "JW PEI",
+    "percentOff": 89,
+    "feedbacks": [
+      {
+        "id": "12-1",
+        "author": "Hana Kim",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-04-04T09:00:00.000Z"
+      },
+      {
+        "id": "12-2",
+        "author": "Emily Carter",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-05-05T09:00:00.000Z"
+      },
+      {
+        "id": "12-3",
+        "author": "Quang Huy",
+        "rating": 3,
+        "comment": "Looks good, though the hardware scratches easily.",
+        "date": "2026-06-06T09:00:00.000Z"
+      },
+      {
+        "id": "12-4",
+        "author": "Mai Phuong",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-07-07T09:00:00.000Z"
+      },
+      {
+        "id": "12-5",
+        "author": "Olivia Park",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-08-08T09:00:00.000Z"
+      },
+      {
+        "id": "12-6",
+        "author": "Thomas Reed",
+        "rating": 5,
+        "comment": "Exactly as pictured, fast delivery and perfect packaging.",
+        "date": "2026-09-09T09:00:00.000Z"
+      }
+    ],
+    "id": "12",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Rounded Mini Tote",
+    "cost": 16,
+    "category": "Mini Tote",
+    "color": "Pink",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Charles & Keith",
+    "percentOff": 39,
+    "feedbacks": [
+      {
+        "id": "13-1",
+        "author": "Minh Anh",
+        "rating": 5,
+        "comment": "Worth every cent. I get compliments every time I carry it.",
+        "date": "2026-02-11T09:00:00.000Z"
+      },
+      {
+        "id": "13-2",
+        "author": "Sophie Nguyen",
+        "rating": 5,
+        "comment": "Exactly as pictured, fast delivery and perfect packaging.",
+        "date": "2026-03-12T09:00:00.000Z"
+      },
+      {
+        "id": "13-3",
+        "author": "David Lee",
+        "rating": 4,
+        "comment": "Lovely bag and roomy enough for daily use. The strap could be a little softer.",
+        "date": "2026-04-13T09:00:00.000Z"
+      },
+      {
+        "id": "13-4",
+        "author": "Hana Kim",
+        "rating": 3,
+        "comment": "Decent quality. Stitching on one corner was not perfect.",
+        "date": "2026-05-14T09:00:00.000Z"
+      },
+      {
+        "id": "13-5",
+        "author": "Emily Carter",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-06-15T09:00:00.000Z"
+      }
+    ],
+    "id": "13",
+    "stock": 10,
+    "status": "published"
+  },
+  {
+    "handbagName": "Classic Flap Shoulder Bag",
+    "cost": 64,
+    "category": "Shoulder Bag",
+    "color": "Olive",
+    "gender": false,
+    "uri": "uri NaN",
+    "brand": "Michael Kors",
+    "percentOff": 38,
+    "feedbacks": [
+      {
+        "id": "14-1",
+        "author": "Olivia Park",
+        "rating": 4,
+        "comment": "Very elegant, fits my phone, wallet and keys easily.",
+        "date": "2026-09-18T09:00:00.000Z"
+      },
+      {
+        "id": "14-2",
+        "author": "Thomas Reed",
+        "rating": 3,
+        "comment": "Nice design, but a bit smaller than I expected for the price.",
+        "date": "2026-01-19T09:00:00.000Z"
+      },
+      {
+        "id": "14-3",
+        "author": "Linh Tran",
+        "rating": 4,
+        "comment": "Great quality overall. Colour is slightly different from the photo but still gorgeous.",
+        "date": "2026-02-20T09:00:00.000Z"
+      },
+      {
+        "id": "14-4",
+        "author": "Minh Anh",
+        "rating": 2,
+        "comment": "Smaller than the photos suggest and the zipper feels stiff.",
+        "date": "2026-03-21T09:00:00.000Z"
+      }
+    ],
+    "id": "14",
+    "stock": 10,
+    "status": "published"
+  }
+]

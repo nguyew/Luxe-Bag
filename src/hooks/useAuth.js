@@ -5,6 +5,7 @@ import {
   login,
   logout,
   register,
+  saveAddresses,
   subscribe,
   updateAccount,
 } from '../services/authStore';
@@ -30,6 +31,7 @@ export default function useAuth() {
       register,
       logout,
       updateAccount,
+      saveAddresses,
     }),
     [snapshot]
   );
