@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Store Admin",
+    "email": "admin@example.com",
+    "passwordHash": "",
+    "salt": "",
+    "role": "admin",
+    "status": "active",
+    "phone": "",
+    "createdAt": "",
+    "addresses": [],
+    "orders": []
+  }
+]
