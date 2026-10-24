@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedbackSection from '../components/FeedbackSection';
+import ReviewPrompt from '../components/ReviewPrompt';
 import RemoteImage from '../components/RemoteImage';
 import StarRating from '../components/StarRating';
 import useAuth from '../hooks/useAuth';
@@ -211,7 +212,8 @@ export default function DetailScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* Feedback */}
+        {/* Viết đánh giá (chỉ khách đã nhận hàng) + Feedback */}
+        <ReviewPrompt handbag={handbag} />
         <FeedbackSection feedbacks={handbag.feedbacks} />
       </ScrollView>
 

@@ -2,12 +2,21 @@
  * Tiện ích xử lý feedback của túi xách.
  *
  * Mỗi handbag trên MockAPI có thêm trường `feedbacks` (mảng):
- *   { id, author, rating (1-5), comment, date (ISO) }
+ *   { id, author, rating (1-5), comment, date (ISO), userId?, hidden? }
+ *  - userId: tài khoản đã viết (đánh giá do khách viết trong app); dữ liệu mẫu không có
+ *  - hidden: true khi admin đã ẩn (kiểm duyệt)
  * Dữ liệu từ API có thể thiếu/sai nên luôn chuẩn hóa trước khi dùng.
  */
 
-// Chuẩn hóa: bỏ mục không hợp lệ, ép kiểu, xếp mới nhất lên trước
-export function normalizeFeedbacks(raw) {
+// Mã định danh của một đánh giá: dùng `id`, thiếu thì dùng vị trí trong mảng gốc.
+// Admin kiểm duyệt cũng dùng đúng công thức này để tìm đúng đánh giá.
+export const feedbackId = (item, index) => String(item?.id ?? `feedback-${index}`);
+
+/**
+ * Chuẩn hóa: bỏ mục không hợp lệ, ép kiểu, xếp mới nhất lên trước.
+ * Mặc định BỎ các đánh giá đã bị admin ẩn; admin truyền { includeHidden: true }.
+ */
+export function normalizeFeedbacks(raw, { includeHidden = false } = {}) {
   if (!Array.isArray(raw)) return [];
 
   return raw
@@ -19,12 +28,17 @@ export function normalizeFeedbacks(raw) {
 
       const time = Date.parse(item.date);
 
+      const hidden = item.hidden === true;
+      if (hidden && !includeHidden) return null;
+
       return {
-        id: String(item.id ?? `feedback-${index}`),
+        id: feedbackId(item, index),
         author: String(item.author || item.user || '').trim() || 'Anonymous',
         rating,
         comment: String(item.comment || '').trim(),
         date: Number.isNaN(time) ? null : time,
+        userId: item.userId ? String(item.userId) : '',
+        hidden,
       };
     })
     .filter(Boolean)

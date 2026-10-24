@@ -10,6 +10,13 @@ import useHandbags from '../hooks/useHandbags';
 import { flattenOrders, inventoryStats, salesSummary } from '../utils/admin';
 import { formatPrice } from '../utils/format';
 
+const MANAGE_LINKS = [
+  { route: 'AdminReports', label: 'Sales report', icon: 'bar-chart-outline' },
+  { route: 'AdminReviews', label: 'Review moderation', icon: 'chatbubble-ellipses-outline' },
+  { route: 'AdminPromotions', label: 'Discount codes', icon: 'pricetag-outline' },
+  { route: 'AdminTaxonomy', label: 'Brands & categories', icon: 'layers-outline' },
+];
+
 /** Dashboard quản trị: số liệu nhanh, bấm vào để tới màn tương ứng. */
 export default function AdminHomeScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -41,6 +48,14 @@ export default function AdminHomeScreen({ navigation }) {
       value: sales ? sales.pending : '…',
       tone: sales && sales.pending > 0 ? 'warn' : 'normal',
       onPress: () => navigation.navigate('AdminOrders'),
+    },
+    {
+      key: 'returns',
+      icon: 'return-up-back-outline',
+      label: 'Return requests',
+      value: sales ? sales.returns : '…',
+      tone: sales && sales.returns > 0 ? 'warn' : 'normal',
+      onPress: () => navigation.navigate('AdminOrders', { filter: 'returns', t: Date.now() }),
     },
     {
       key: 'revenue',
@@ -124,6 +139,24 @@ export default function AdminHomeScreen({ navigation }) {
           ))}
         </View>
 
+        <Text style={styles.manageTitle}>Manage</Text>
+        <View style={styles.manage}>
+          {MANAGE_LINKS.map((link, index) => (
+            <Pressable
+              key={link.route}
+              onPress={() => navigation.navigate(link.route)}
+              style={[styles.manageRow, index < MANAGE_LINKS.length - 1 && styles.manageDivider]}
+              accessibilityRole="button"
+            >
+              <View style={styles.manageIcon}>
+                <Ionicons name={link.icon} size={18} color="#1A1A1A" />
+              </View>
+              <Text style={styles.manageLabel}>{link.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color="#B9B2AA" />
+            </Pressable>
+          ))}
+        </View>
+
         <Pressable onPress={reload} style={styles.refresh} accessibilityRole="button">
           <Ionicons name="refresh" size={16} color="#1A1A1A" />
           <Text style={styles.refreshText}>Refresh data</Text>
@@ -134,6 +167,33 @@ export default function AdminHomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  manageTitle: {
+    marginTop: 26,
+    marginBottom: 10,
+    marginHorizontal: 24,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: '#77716A',
+  },
+  manage: {
+    marginHorizontal: 20,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+  },
+  manageRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  manageDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E4DFDA' },
+  manageIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F3F1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1A1A1A' },
   safeArea: { flex: 1, backgroundColor: '#F3F1F1' },
   content: { paddingBottom: 32 },
   logout: {

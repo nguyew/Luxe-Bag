@@ -11,11 +11,15 @@
  * vẫn có thể làm kho sai. Chấp nhận được với bài tập, nên ghi rõ trong báo cáo.
  */
 import { api } from './api';
+import { fetchPromotions, redeemCoupon } from './promotionService';
 import { getStock, isPublished, unitPrice } from '../utils/catalog';
+import { describeCouponError, validateCoupon } from '../utils/coupons';
 import {
   PAYMENT_METHODS,
+  RETURN_REASONS,
   calcTotals,
   canCancel,
+  canRequestReturn,
   generateOrderId,
 } from '../utils/orders';
 
@@ -41,6 +45,12 @@ export function describeOrderError(error) {
       return 'Some items are no longer available in the requested quantity. Please review your bag.';
     case 'not_found':
       return 'We could not find this order.';
+    case 'invalid_coupon':
+      return error.message;
+    case 'return_not_allowed':
+      return 'This order is no longer eligible for a return.';
+    case 'invalid_return':
+      return 'This return request has already been handled.';
     case 'invalid_transition':
       return 'This order status can no longer be changed that way. It may have been updated already.';
     case 'not_cancellable':
@@ -100,12 +110,12 @@ function sortNewestFirst(orders) {
 
 /**
  * Đặt hàng.
- *  - userId, address (object địa chỉ), paymentMethod ('cod' | 'card')
+ *  - userId, address (object địa chỉ), paymentMethod ('cod' | 'card'), couponCode (tùy chọn)
  *  - lines: [{ id, qty }] lấy từ giỏ hàng
  * Trả về đơn hàng đã lưu. Ném OrderError nếu có vấn đề
  * (code 'unavailable' kèm `details` = [{ id, name, reason, available }]).
  */
-export async function placeOrder({ userId, lines, address, paymentMethod }) {
+export async function placeOrder({ userId, lines, address, paymentMethod, couponCode }) {
   if (!Array.isArray(lines) || lines.length === 0) throw new OrderError('empty');
   if (!address) throw new OrderError('no_address');
   if (!PAYMENT_METHODS[paymentMethod]) {
@@ -140,7 +150,27 @@ export async function placeOrder({ userId, lines, address, paymentMethod }) {
       throw new OrderError('unavailable', 'Items unavailable', problems);
     }
 
-    // 2) Trừ kho (hoàn lại nếu một món bị lỗi)
+    // 2) Chốt giá tại thời điểm đặt hàng, rồi áp mã giảm giá (kiểm tra lại với dữ liệu mới nhất)
+    const items = checked.map((entry) => ({
+      handbagId: String(entry.record.id),
+      name: entry.record.handbagName,
+      brand: entry.record.brand || '',
+      uri: entry.record.uri || '',
+      unitPrice: unitPrice(entry.record),
+      qty: entry.qty,
+    }));
+
+    let coupon = null;
+    let discount = 0;
+    if (couponCode) {
+      const result = validateCoupon(await fetchPromotions(), couponCode, calcTotals(items).subtotal);
+      if (!result.ok) throw new OrderError('invalid_coupon', describeCouponError(result));
+      coupon = result.coupon;
+      discount = result.discount;
+    }
+    const totals = calcTotals(items, discount);
+
+    // 3) Trừ kho (hoàn lại nếu một món bị lỗi)
     const taken = [];
     try {
       for (const entry of checked) {
@@ -156,16 +186,7 @@ export async function placeOrder({ userId, lines, address, paymentMethod }) {
       throw error;
     }
 
-    // 3) Ghi đơn vào user. Giá chốt tại thời điểm đặt hàng
-    const items = checked.map((entry) => ({
-      handbagId: String(entry.record.id),
-      name: entry.record.handbagName,
-      brand: entry.record.brand || '',
-      uri: entry.record.uri || '',
-      unitPrice: unitPrice(entry.record),
-      qty: entry.qty,
-    }));
-    const totals = calcTotals(items);
+    // 4) Ghi đơn vào user
     const now = new Date().toISOString();
     const order = {
       id: generateOrderId(),
@@ -179,6 +200,7 @@ export async function placeOrder({ userId, lines, address, paymentMethod }) {
         line1: address.line1,
         city: address.city,
       },
+      couponCode: coupon ? coupon.code : null,
       paymentMethod,
       paymentStatus: paymentMethod === 'card' ? 'paid' : 'unpaid',
       history: [{ status: 'pending', at: now }],
@@ -195,6 +217,7 @@ export async function placeOrder({ userId, lines, address, paymentMethod }) {
       throw error;
     }
 
+    if (coupon) await redeemCoupon(coupon.id); // ghi nhận lượt dùng (không bao giờ ném lỗi)
     return order;
   } catch (error) {
     if (error instanceof OrderError) throw error;
@@ -241,6 +264,44 @@ export async function cancelOrder(userId, orderId) {
     });
 
     await restoreOrderStock(order);
+    return updated;
+  } catch (error) {
+    if (error instanceof OrderError) throw error;
+    throw new OrderError('network');
+  }
+}
+
+/**
+ * Khách yêu cầu trả hàng cho đơn đã giao (trong RETURN_WINDOW_DAYS ngày, mỗi đơn một lần).
+ * Kiểm tra lại trên dữ liệu mới nhất. Trả về đơn đã cập nhật.
+ */
+export async function requestReturn(userId, orderId, { reason, note }) {
+  if (!RETURN_REASONS.includes(reason)) {
+    throw new OrderError('invalid_input', 'Please choose a reason for the return.');
+  }
+
+  try {
+    const record = await api.get(userPath(userId));
+    const orders = asArray(record.orders);
+    const index = orders.findIndex((order) => order.id === orderId);
+
+    if (index < 0) throw new OrderError('not_found');
+    const order = orders[index];
+    if (!canRequestReturn(order)) throw new OrderError('return_not_allowed');
+
+    const updated = {
+      ...order,
+      returnRequest: {
+        status: 'requested',
+        reason,
+        note: String(note ?? '').trim().slice(0, 300),
+        requestedAt: new Date().toISOString(),
+      },
+    };
+    await api.put(userPath(userId), {
+      ...record,
+      orders: orders.map((item, i) => (i === index ? updated : item)),
+    });
     return updated;
   } catch (error) {
     if (error instanceof OrderError) throw error;

@@ -18,6 +18,13 @@ import AdminTabs from './AdminTabs';
 import AdminProductFormScreen from '../screens/AdminProductFormScreen';
 import AdminOrderDetailScreen from '../screens/AdminOrderDetailScreen';
 import AdminCustomerDetailScreen from '../screens/AdminCustomerDetailScreen';
+import AdminReviewsScreen from '../screens/AdminReviewsScreen';
+import AdminPromotionsScreen from '../screens/AdminPromotionsScreen';
+import AdminCouponFormScreen from '../screens/AdminCouponFormScreen';
+import AdminReportsScreen from '../screens/AdminReportsScreen';
+import AdminTaxonomyScreen from '../screens/AdminTaxonomyScreen';
+import ReviewFormScreen from '../screens/ReviewFormScreen';
+import ReturnRequestScreen from '../screens/ReturnRequestScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import AddressesScreen from '../screens/AddressesScreen';
 import AddressFormScreen from '../screens/AddressFormScreen';
@@ -220,6 +227,34 @@ export default function AppNavigator() {
             component={AdminCustomerDetailScreen}
             options={{ title: 'Customer', ...detailHeader }}
           />
+          <Stack.Screen
+            name="AdminReviews"
+            component={AdminReviewsScreen}
+            options={{ title: 'Review Moderation', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="AdminPromotions"
+            component={AdminPromotionsScreen}
+            options={{ title: 'Discount Codes', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="AdminCouponForm"
+            component={AdminCouponFormScreen}
+            options={({ route }) => ({
+              title: route.params?.couponId ? 'Edit Code' : 'New Code',
+              ...detailHeader,
+            })}
+          />
+          <Stack.Screen
+            name="AdminReports"
+            component={AdminReportsScreen}
+            options={{ title: 'Sales Report', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="AdminTaxonomy"
+            component={AdminTaxonomyScreen}
+            options={{ title: 'Brands & Categories', ...detailHeader }}
+          />
         </>
       ) : (
         <>
@@ -257,6 +292,16 @@ export default function AppNavigator() {
             name="OrderDetail"
             component={OrderDetailScreen}
             options={{ title: 'Order Details', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="ReviewForm"
+            component={ReviewFormScreen}
+            options={{ title: 'Your Review', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="ReturnRequest"
+            component={ReturnRequestScreen}
+            options={{ title: 'Return Request', ...detailHeader }}
           />
           <Stack.Screen
             name="Addresses"

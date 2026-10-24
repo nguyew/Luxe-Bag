@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FilterSheet from '../components/FilterSheet';
 import HandbagCard from '../components/HandbagCard';
 import useFavorites from '../hooks/useFavorites';
 import useHandbags from '../hooks/useHandbags';
+import { DEFAULT_FILTERS, applyFilters, countActiveFilters } from '../utils/filters';
 import { filterHandbags } from '../utils/search';
 
 const DEBOUNCE_MS = 200;
@@ -40,6 +42,8 @@ export default function SearchScreen({ navigation }) {
   const { items: handbags, loading, error, reload: loadProducts } = useHandbags();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Debounce: chỉ lọc sau khi người dùng ngừng gõ một chút
   useEffect(() => {
@@ -49,14 +53,14 @@ export default function SearchScreen({ navigation }) {
 
   const searching = debouncedQuery.trim().length > 0;
 
-  // Lọc theo từ khóa, rồi xếp giá giảm dần (giống Home)
-  const results = useMemo(
-    () =>
-      [...filterHandbags(handbags, debouncedQuery)].sort(
-        (a, b) => Number(b.cost) - Number(a.cost)
-      ),
+  // Lọc theo từ khóa, rồi áp bộ lọc nâng cao và sắp xếp (mặc định giá giảm dần, giống Home)
+  const matched = useMemo(
+    () => filterHandbags(handbags, debouncedQuery),
     [handbags, debouncedQuery]
   );
+  const results = useMemo(() => applyFilters(matched, filters), [matched, filters]);
+  const activeFilters = countActiveFilters(filters);
+  const clearFilters = useCallback(() => setFilters(DEFAULT_FILTERS), []);
 
   // Lưới 2 cột: nếu số lẻ thì thêm ô trống để thẻ cuối không bị kéo giãn
   const data = useMemo(
@@ -94,6 +98,29 @@ export default function SearchScreen({ navigation }) {
     setDebouncedQuery('');
   }, []);
 
+  // Nút mở bảng lọc, có huy hiệu số bộ lọc đang bật
+  const filterButton = (
+    <Pressable
+      onPress={() => setSheetOpen(true)}
+      style={[styles.filterButton, activeFilters > 0 && styles.filterButtonOn]}
+      accessibilityRole="button"
+      accessibilityLabel={
+        activeFilters > 0 ? `Filters, ${activeFilters} active` : 'Filters'
+      }
+    >
+      <Ionicons
+        name="options-outline"
+        size={22}
+        color={activeFilters > 0 ? '#FFFFFF' : '#1A1A1A'}
+      />
+      {activeFilters > 0 && (
+        <View style={styles.filterBadge}>
+          <Text style={styles.filterBadgeText}>{activeFilters}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+
   // Ô nhập từ khóa (nằm ngoài FlatList để không mất focus khi danh sách đổi)
   const searchBar = (
     <View style={styles.searchBox}>
@@ -130,6 +157,7 @@ export default function SearchScreen({ navigation }) {
         {searching
           ? `${results.length} ${results.length === 1 ? 'result' : 'results'} for “${debouncedQuery.trim()}”`
           : `All handbags (${results.length})`}
+        {activeFilters > 0 ? ` · ${activeFilters} ${activeFilters === 1 ? 'filter' : 'filters'}` : ''}
       </Text>
     ) : null;
 
@@ -163,9 +191,9 @@ export default function SearchScreen({ navigation }) {
       <StateMessage
         icon="search-outline"
         title="No handbags found"
-        message="Try a different name or brand."
-        actionLabel="Clear search"
-        onAction={clearQuery}
+        message="Try a different name, brand or filters."
+        actionLabel={activeFilters > 0 ? 'Clear filters' : 'Clear search'}
+        onAction={activeFilters > 0 ? clearFilters : clearQuery}
       />
     );
   }
@@ -173,7 +201,10 @@ export default function SearchScreen({ navigation }) {
   return (
     <View style={styles.screen}>
       <View style={styles.top}>
-        {searchBar}
+        <View style={styles.searchRow}>
+          {searchBar}
+          {filterButton}
+        </View>
         {summary}
       </View>
 
@@ -196,6 +227,17 @@ export default function SearchScreen({ navigation }) {
         windowSize={7}
         removeClippedSubviews
       />
+
+      <FilterSheet
+        visible={sheetOpen}
+        items={matched}
+        filters={filters}
+        onApply={(next) => {
+          setFilters(next);
+          setSheetOpen(false);
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
     </View>
   );
 }
@@ -211,8 +253,33 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
 
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  filterButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterButtonOn: { backgroundColor: '#050505' },
+  filterBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: '#FF4D5E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: { fontSize: 10, fontWeight: '800', color: '#FFFFFF' },
+
   // Ô tìm kiếm
   searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     height: 48,

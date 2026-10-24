@@ -45,9 +45,9 @@ export default function BulkDiscountSheet({ visible, items, onClose }) {
   const apply = () => {
     if (!valid || busy || affected.length === 0) return;
 
-    const what = percent === 0 ? 'Remove the discount from' : `Set ${percent}% off on`;
+    const what = percent === 0 ? 'Remove the “% off” label from' : `Set the “${percent}% off” label on`;
     Alert.alert(
-      'Apply discount?',
+      'Apply label?',
       `${what} ${affected.length} ${affected.length === 1 ? 'product' : 'products'}${
         target === 'all' ? '' : ` (${target})`
       }.`,
@@ -84,8 +84,10 @@ export default function BulkDiscountSheet({ visible, items, onClose }) {
       <Pressable style={styles.backdrop} onPress={busy ? undefined : onClose} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <Text style={styles.title}>Bulk discount</Text>
-          <Text style={styles.sub}>Apply the same discount to many products at once.</Text>
+          <Text style={styles.title}>Bulk “% off” label</Text>
+          <Text style={styles.sub}>
+            Sets the “% off” label shown on products. Prices stay the same – use discount codes for real price cuts.
+          </Text>
 
           <Text style={styles.label}>Apply to</Text>
           <View style={styles.chipsWrap}>
@@ -115,7 +117,7 @@ export default function BulkDiscountSheet({ visible, items, onClose }) {
             style={[styles.primary, (!valid || busy || affected.length === 0) && styles.disabled]}
             accessibilityRole="button"
           >
-            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Apply discount</Text>}
+            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Apply label</Text>}
           </Pressable>
           <Pressable onPress={onClose} disabled={busy} style={styles.cancel} accessibilityRole="button">
             <Text style={styles.cancelText}>Close</Text>

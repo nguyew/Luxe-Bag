@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +17,14 @@ import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import useHandbags from '../hooks/useHandbags';
 import { describeOrderError, placeOrder } from '../services/orderService';
-import { PAYMENT_METHODS } from '../utils/orders';
+import { fetchPromotions } from '../services/promotionService';
+import {
+  calcCouponDiscount,
+  describeCoupon,
+  describeCouponError,
+  validateCoupon,
+} from '../utils/coupons';
+import { PAYMENT_METHODS, calcTotals } from '../utils/orders';
 import { formatPrice } from '../utils/format';
 import { tapLight } from '../utils/haptics';
 
@@ -41,6 +49,12 @@ export default function CheckoutScreen({ navigation }) {
   const [error, setError] = useState('');
   const [problems, setProblems] = useState([]);
 
+  // Mã giảm giá
+  const [couponInput, setCouponInput] = useState('');
+  const [applied, setApplied] = useState(null); // { coupon }
+  const [couponError, setCouponError] = useState('');
+  const [checking, setChecking] = useState(false);
+
   const addresses = user?.addresses || [];
   const address =
     addresses.find((item) => item.id === addressId) ||
@@ -64,6 +78,7 @@ export default function CheckoutScreen({ navigation }) {
         lines: cart.lines.map((line) => ({ id: line.id, qty: line.qty })),
         address,
         paymentMethod: method,
+        couponCode: applied ? applied.coupon.code : undefined,
       });
       tapLight();
       cart.clear();
@@ -73,10 +88,33 @@ export default function CheckoutScreen({ navigation }) {
     } catch (e) {
       setError(describeOrderError(e));
       setProblems(e?.code === 'unavailable' ? e.details : []);
+      if (e?.code === 'invalid_coupon') {
+        setApplied(null); // mã không còn dùng được: bỏ khỏi đơn để khách xem lại tổng tiền
+        setCouponError(e.message);
+      }
       if (e?.code === 'unavailable') reload(); // để giỏ hàng đánh dấu món có vấn đề
       setBusy(false);
     }
-  }, [busy, user, address, cart, method, reload, navigation]);
+  }, [busy, user, address, cart, method, applied, reload, navigation]);
+
+  const applyCoupon = useCallback(async () => {
+    if (checking) return;
+    setChecking(true);
+    setCouponError('');
+    try {
+      const result = validateCoupon(await fetchPromotions(), couponInput, cart.subtotal);
+      if (result.ok) {
+        setApplied({ coupon: result.coupon });
+        setCouponInput('');
+      } else {
+        setCouponError(describeCouponError(result));
+      }
+    } catch {
+      setCouponError('Could not check the code. Check your connection and try again.');
+    } finally {
+      setChecking(false);
+    }
+  }, [checking, couponInput, cart.subtotal]);
 
   if (!isLoggedIn) {
     return (
@@ -103,6 +141,15 @@ export default function CheckoutScreen({ navigation }) {
   }
 
   const blocked = cart.hasProblem || cart.subtotal <= 0;
+
+  // Tổng tiền hiển thị: đã trừ mã giảm giá (tính lại theo giỏ hiện tại)
+  const discount = applied ? calcCouponDiscount(applied.coupon, cart.subtotal) : 0;
+  const totals = calcTotals(
+    cart.lines
+      .filter((line) => !line.problem)
+      .map((line) => ({ unitPrice: line.unitPrice, qty: line.qty })),
+    discount
+  );
 
   return (
     <View style={styles.screen}>
@@ -157,6 +204,60 @@ export default function CheckoutScreen({ navigation }) {
           </Pressable>
         ))}
 
+        {/* Mã giảm giá */}
+        <Text style={styles.section}>Discount code</Text>
+        {applied ? (
+          <View style={styles.couponApplied}>
+            <Ionicons name="pricetag" size={18} color="#1F7A3E" />
+            <View style={styles.couponText}>
+              <Text style={styles.couponCode}>{applied.coupon.code}</Text>
+              <Text style={styles.couponDesc}>{describeCoupon(applied.coupon)}</Text>
+            </View>
+            <Pressable
+              onPress={() => setApplied(null)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Remove discount code"
+            >
+              <Text style={styles.couponRemove}>Remove</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.couponRow}>
+            <TextInput
+              value={couponInput}
+              onChangeText={(text) => {
+                setCouponInput(text);
+                setCouponError('');
+              }}
+              placeholder="Enter code"
+              placeholderTextColor="#9A948D"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={styles.couponInput}
+              returnKeyType="done"
+              onSubmitEditing={applyCoupon}
+              accessibilityLabel="Discount code"
+            />
+            <Pressable
+              onPress={applyCoupon}
+              disabled={checking || couponInput.trim().length === 0}
+              style={[
+                styles.couponButton,
+                (checking || couponInput.trim().length === 0) && styles.couponButtonOff,
+              ]}
+              accessibilityRole="button"
+            >
+              {checking ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.couponButtonText}>Apply</Text>
+              )}
+            </Pressable>
+          </View>
+        )}
+        {!!couponError && <Text style={styles.couponError}>{couponError}</Text>}
+
         {/* Tóm tắt đơn */}
         <Text style={styles.section}>Order summary</Text>
         <View style={styles.summary}>
@@ -174,17 +275,23 @@ export default function CheckoutScreen({ navigation }) {
           <View style={styles.divider} />
           <View style={styles.lineRow}>
             <Text style={styles.rowLabel}>Subtotal</Text>
-            <Text style={styles.lineValue}>{formatPrice(cart.subtotal)}</Text>
+            <Text style={styles.lineValue}>{formatPrice(totals.subtotal)}</Text>
           </View>
+          {totals.discount > 0 && (
+            <View style={styles.lineRow}>
+              <Text style={styles.rowLabel}>Discount ({applied.coupon.code})</Text>
+              <Text style={[styles.lineValue, styles.discountText]}>-{formatPrice(totals.discount)}</Text>
+            </View>
+          )}
           <View style={styles.lineRow}>
             <Text style={styles.rowLabel}>Shipping</Text>
             <Text style={styles.lineValue}>
-              {cart.shipping === 0 ? 'Free' : formatPrice(cart.shipping)}
+              {totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}
             </Text>
           </View>
           <View style={styles.lineRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{formatPrice(cart.total)}</Text>
+            <Text style={styles.totalValue}>{formatPrice(totals.total)}</Text>
           </View>
         </View>
 
@@ -221,7 +328,7 @@ export default function CheckoutScreen({ navigation }) {
           {busy ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.placeText}>Place order · {formatPrice(cart.total)}</Text>
+            <Text style={styles.placeText}>Place order · {formatPrice(totals.total)}</Text>
           )}
         </Pressable>
       </View>
@@ -266,6 +373,42 @@ export default function CheckoutScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  discountText: { color: '#1F7A3E' },
+  couponRow: { flexDirection: 'row', gap: 10 },
+  couponInput: {
+    flex: 1,
+    height: 48,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    color: '#1A1A1A',
+  },
+  couponButton: {
+    width: 88,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#050505',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  couponButtonOff: { backgroundColor: '#B9B2AA' },
+  couponButtonText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  couponError: { marginTop: 8, marginLeft: 8, fontSize: 12, color: '#B3261E' },
+  couponApplied: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: '#DFF3E5',
+  },
+  couponText: { flex: 1 },
+  couponCode: { fontSize: 14, fontWeight: '800', letterSpacing: 0.6, color: '#1F7A3E' },
+  couponDesc: { marginTop: 1, fontSize: 12, color: '#1F7A3E' },
+  couponRemove: { fontSize: 13, fontWeight: '700', color: '#1F7A3E', textDecorationLine: 'underline' },
   screen: { flex: 1, backgroundColor: '#F3F1F1' },
   center: { alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16 },

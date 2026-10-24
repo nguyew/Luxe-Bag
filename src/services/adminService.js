@@ -13,6 +13,7 @@
 import { api } from './api';
 import { removeHandbag, upsertHandbag } from './handbagStore';
 import { OrderError, restoreOrderStock } from './orderService';
+import { feedbackId } from '../utils/feedback';
 import { toPublicUser } from './userService';
 import { nextStatuses } from '../utils/orders';
 
@@ -119,21 +120,51 @@ export async function deleteHandbag(id) {
 }
 
 /**
- * Đặt % giảm giá cho nhiều sản phẩm. percentOff là số thập phân (0.2 = 20%).
+ * Cập nhật cùng một thay đổi cho nhiều sản phẩm (đổi tên brand/category, giảm giá...).
  * Trả về { updated, failed: [id...] } – một sản phẩm lỗi không làm dừng cả lô.
  */
-export async function applyBulkDiscount(ids, percentOff) {
+export async function bulkUpdateHandbags(ids, patch) {
   let updated = 0;
   const failed = [];
   for (const id of ids) {
     try {
-      await updateHandbag(id, { percentOff });
+      await updateHandbag(id, patch);
       updated += 1;
     } catch {
       failed.push(id);
     }
   }
   return { updated, failed };
+}
+
+/** Đặt % giảm giá cho nhiều sản phẩm. percentOff là số thập phân (0.2 = 20%). */
+export const applyBulkDiscount = (ids, percentOff) => bulkUpdateHandbags(ids, { percentOff });
+
+// ---------------------------------------------------------------------------
+// Kiểm duyệt đánh giá
+// ---------------------------------------------------------------------------
+// Đọc bản mới nhất của túi, sửa mảng feedbacks bằng `mutate`, rồi ghi lại
+async function mutateFeedbacks(handbagId, mutate) {
+  const path = handbagPath(handbagId);
+  const record = await api.get(path);
+  const saved = await api.put(path, { ...record, feedbacks: mutate(asArray(record.feedbacks)) });
+  upsertHandbag(saved);
+}
+
+/** Ẩn / hiện một đánh giá (đánh giá bị ẩn không hiện cho khách và không tính điểm trung bình). */
+export function setReviewHidden(handbagId, reviewId, hidden) {
+  return mutateFeedbacks(handbagId, (list) =>
+    list.map((item, index) =>
+      feedbackId(item, index) === String(reviewId) ? { ...item, hidden: !!hidden } : item
+    )
+  );
+}
+
+/** Xóa hẳn một đánh giá. */
+export function deleteReview(handbagId, reviewId) {
+  return mutateFeedbacks(handbagId, (list) =>
+    list.filter((item, index) => feedbackId(item, index) !== String(reviewId))
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -201,4 +232,59 @@ export async function setCustomerStatus(userId, status) {
   const saved = await api.put(path, { ...record, status });
   invalidateAdminCache();
   return toPublicUser(saved);
+}
+
+// ---------------------------------------------------------------------------
+// Trả hàng & hoàn tiền
+// ---------------------------------------------------------------------------
+/**
+ * Xử lý yêu cầu trả hàng của khách.
+ *  - decision 'approve': đơn chuyển sang 'returned', ghi nhận hoàn tiền;
+ *    restock = true thì sản phẩm được cộng lại vào kho (hàng còn bán được).
+ *  - decision 'reject': giữ nguyên đơn, ghi lý do từ chối cho khách xem.
+ */
+export async function resolveReturn(userId, orderId, decision, { restock = false, note = '' } = {}) {
+  try {
+    if (decision !== 'approve' && decision !== 'reject') throw new OrderError('invalid_return');
+
+    const path = userPath(userId);
+    const record = await api.get(path);
+    const orders = asArray(record.orders);
+    const index = orders.findIndex((order) => order.id === orderId);
+
+    if (index < 0) throw new OrderError('not_found');
+    const order = orders[index];
+    if (order.returnRequest?.status !== 'requested') throw new OrderError('invalid_return');
+
+    const approve = decision === 'approve';
+    const now = new Date().toISOString();
+    const updated = {
+      ...order,
+      returnRequest: {
+        ...order.returnRequest,
+        status: approve ? 'approved' : 'rejected',
+        resolvedAt: now,
+        adminNote: String(note ?? '').trim().slice(0, 300),
+        restocked: approve && !!restock,
+      },
+    };
+    if (approve) {
+      updated.status = 'returned';
+      updated.returnedAt = now;
+      if (order.paymentStatus === 'paid') updated.paymentStatus = 'refunded';
+      updated.history = [...asArray(order.history), { status: 'returned', at: now }];
+    }
+
+    await api.put(path, {
+      ...record,
+      orders: orders.map((item, i) => (i === index ? updated : item)),
+    });
+    invalidateAdminCache();
+
+    if (approve && restock) await restoreOrderStock(order);
+    return updated;
+  } catch (error) {
+    if (error instanceof OrderError) throw error;
+    throw new OrderError('network');
+  }
 }
