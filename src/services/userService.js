@@ -12,7 +12,13 @@
  */
 import * as Crypto from 'expo-crypto';
 import { api } from './api';
-import { validateEmail, validateName, validatePassword } from '../utils/validation';
+import {
+  validateEmail,
+  validateName,
+  validatePassword,
+  validatePhone,
+  validateRequired,
+} from '../utils/validation';
 
 const ENDPOINT = 'users';
 
@@ -49,7 +55,8 @@ export function toPublicUser(record) {
     id: String(record.id),
     name: String(record.name || ''),
     email: normalizeEmail(record.email),
-    role: record.role === 'admin' ? 'admin' : 'customer',
+    // 'system' = bản ghi nội bộ (mã giảm giá), không phải tài khoản đăng nhập
+    role: record.role === 'admin' ? 'admin' : record.role === 'system' ? 'system' : 'customer',
     status: record.status === 'disabled' ? 'disabled' : 'active',
     phone: String(record.phone || ''),
     createdAt: record.createdAt || null,
@@ -170,4 +177,49 @@ export async function listUsers() {
     if (error?.status === 404) return [];
     throw error;
   }
+}
+
+export const MAX_ADDRESSES = 10;
+
+/** Chuẩn hóa danh sách địa chỉ: bỏ mục sai, luôn có đúng một địa chỉ mặc định. */
+export function sanitizeAddresses(list) {
+  if (!Array.isArray(list)) return [];
+
+  const cleaned = list
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      id: String(item.id || ''),
+      label: String(item.label || '').trim().slice(0, 20) || 'Home',
+      fullName: String(item.fullName || '').trim(),
+      phone: String(item.phone || '').trim(),
+      line1: String(item.line1 || '').trim(),
+      city: String(item.city || '').trim(),
+      isDefault: item.isDefault === true,
+    }))
+    .filter(
+      (item) =>
+        item.id &&
+        !validateRequired(item.fullName, 'x') &&
+        !validatePhone(item.phone) &&
+        !validateRequired(item.line1, 'x') &&
+        !validateRequired(item.city, 'x')
+    )
+    .slice(0, MAX_ADDRESSES);
+
+  if (cleaned.length > 0) {
+    const firstDefault = cleaned.findIndex((item) => item.isDefault);
+    const keep = firstDefault >= 0 ? firstDefault : 0;
+    cleaned.forEach((item, index) => {
+      item.isDefault = index === keep;
+    });
+  }
+  return cleaned;
+}
+
+/** Ghi lại toàn bộ địa chỉ của user (đọc bản mới nhất trước để không mất orders). */
+export async function setUserAddresses(id, addresses) {
+  const path = `${ENDPOINT}/${encodeURIComponent(id)}`;
+  const record = await api.get(path);
+  const saved = await api.put(path, { ...record, addresses: sanitizeAddresses(addresses) });
+  return toPublicUser(saved);
 }

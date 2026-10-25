@@ -31,3 +31,14 @@ export function validatePassword(value) {
   }
   return '';
 }
+
+export function validatePhone(value) {
+  const digits = String(value ?? '').replace(/[\s().+-]/g, '');
+  if (!digits) return 'Enter a phone number.';
+  if (!/^\d{8,15}$/.test(digits)) return 'Enter a valid phone number.';
+  return '';
+}
+
+export function validateRequired(value, message) {
+  return String(value ?? '').trim() ? '' : message;
+}
