@@ -34,6 +34,14 @@ Email verification is intentionally not enabled yet and can be added before
 activating an account in a future iteration. Open `/api-docs` in a browser for
 the interactive OpenAPI/Swagger documentation.
 
+Administrators can manage customer accounts with a JWT for an admin user:
+
+- `POST /api/admin/customers` — create a customer
+- `GET /api/admin/customers` — list customers with pagination, search, and status filters
+- `GET /api/admin/customers/:id` — view a customer
+- `PATCH /api/admin/customers/:id` — update customer profile or password
+- `PATCH /api/admin/customers/:id/disable` — disable a customer account
+
 ## Seed MongoDB
 
 The idempotent seed script at `scripts/seed-mongodb.js` creates the Mongoose

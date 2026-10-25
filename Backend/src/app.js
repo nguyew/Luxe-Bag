@@ -6,6 +6,7 @@ const passport = require('./config/passport');
 const swaggerUi = require('swagger-ui-express');
 const { clientOrigin, nodeEnv } = require('./config/env');
 const swaggerDocument = require('./config/swagger');
+const adminRoutes = require('./routes/adminRoutes');
 const authRoutes = require('./routes/authRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -25,6 +26,7 @@ app.get('/', (req, res) => {
 });
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
 
 app.use(notFound);

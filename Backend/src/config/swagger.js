@@ -35,6 +35,28 @@ const swaggerDefinition = {
           password: { type: 'string', format: 'password', example: 'secret123' },
         },
       },
+      AdminCustomerRequest: {
+        type: 'object',
+        required: ['name', 'email', 'password'],
+        properties: {
+          name: { type: 'string', minLength: 2, maxLength: 100 },
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', format: 'password', minLength: 8 },
+          phone: { type: 'string' },
+          avatarUrl: { type: 'string', format: 'uri' },
+        },
+      },
+      AdminCustomerUpdateRequest: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 2, maxLength: 100 },
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', format: 'password', minLength: 8 },
+          phone: { type: 'string' },
+          avatarUrl: { type: 'string', format: 'uri' },
+        },
+        minProperties: 1,
+      },
     },
   },
 };
