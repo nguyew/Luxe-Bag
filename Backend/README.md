@@ -42,6 +42,21 @@ Administrators can manage customer accounts with a JWT for an admin user:
 - `PATCH /api/admin/customers/:id` — update customer profile or password
 - `PATCH /api/admin/customers/:id/disable` — disable a customer account
 
+Administrators can manage handbag products:
+
+- `GET /api/products` — list published products
+- `GET /api/admin/products` — list all products
+- `POST /api/admin/products` — create a product
+- `GET /api/admin/products/:id` — view a product
+- `PATCH /api/admin/products/:id` — update a product
+- `DELETE /api/admin/products/:id` — permanently delete a product
+- `POST /api/admin/products/image-upload` — create a short-lived Backblaze B2 upload URL
+- `POST /api/admin/products/image-upload/proxy` — upload an image through the API (avoids browser-to-B2 CORS)
+
+Configure the `B2_*` variables in `.env` for image uploads. The bucket may be
+public for product delivery, but B2 application keys must only exist on the
+backend. The mobile app uploads directly to B2 using the presigned URL.
+
 ## Seed MongoDB
 
 The idempotent seed script at `scripts/seed-mongodb.js` creates the Mongoose

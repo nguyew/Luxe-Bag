@@ -11,12 +11,13 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import AuthField from '../components/AuthField';
 import FilterChips from '../components/FilterChips';
 import RemoteImage from '../components/RemoteImage';
 import { PRODUCT_STATUS } from '../components/ProductStatusBadge';
 import useHandbags, { useHandbag } from '../hooks/useHandbags';
-import { createHandbag, deleteHandbag, updateHandbag } from '../services/adminService';
+import { createHandbag, deleteHandbag, updateHandbag, uploadProductImage } from '../services/adminService';
 import { getStock } from '../utils/catalog';
 
 const IMAGE_URL = /^https?:\/\/\S+$/i;
@@ -57,9 +58,11 @@ export default function AdminProductFormScreen({ navigation, route }) {
   const [stock, setStock] = useState(editing ? initialStock : '10');
   const [status, setStatus] = useState(existing?.status || (editing ? 'published' : 'draft'));
   const [uri, setUri] = useState(existing?.uri || '');
+  const [imageKey, setImageKey] = useState(existing?.imageKey || '');
 
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
 
   const nameRef = useRef(null);
   const brandRef = useRef(null);
@@ -87,6 +90,29 @@ export default function AdminProductFormScreen({ navigation, route }) {
   );
 
   const validUri = IMAGE_URL.test(uri.trim());
+
+  const chooseImage = useCallback(async () => {
+    if (imageBusy) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    const contentType = asset.mimeType || 'image/jpeg';
+    setImageBusy(true);
+    try {
+      const uploaded = await uploadProductImage(asset.uri, contentType);
+      setUri(uploaded.uri);
+      setImageKey(uploaded.imageKey);
+    } catch {
+      Alert.alert('Image', 'Could not upload the image. Please try again.');
+    } finally {
+      setImageBusy(false);
+    }
+  }, [imageBusy]);
 
   const submit = useCallback(async () => {
     if (busy) return;
@@ -131,6 +157,7 @@ export default function AdminProductFormScreen({ navigation, route }) {
         .filter(Boolean),
       gender,
       uri: uri.trim(),
+      imageKey,
       status,
     };
     // Chỉ gửi stock khi admin chủ động sửa: tránh ghi đè số lượng khách vừa mua
@@ -147,7 +174,7 @@ export default function AdminProductFormScreen({ navigation, route }) {
     }
   }, [
     busy, name, brand, category, cost, discount, colors, gender, stock, status, uri,
-    editing, initialStock, validUri, handbagId, navigation,
+    editing, initialStock, validUri, handbagId, navigation, imageKey,
   ]);
 
   const archive = useCallback(async () => {
@@ -212,6 +239,9 @@ export default function AdminProductFormScreen({ navigation, route }) {
             <Ionicons name="image-outline" size={40} color="#B9B2AA" />
           )}
         </View>
+        <Pressable onPress={chooseImage} style={styles.imageButton} disabled={imageBusy}>
+          {imageBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.imageButtonText}>Choose and upload image</Text>}
+        </Pressable>
         <AuthField
           ref={uriRef}
           label="Image link"
@@ -424,6 +454,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   previewImage: { width: '100%', height: '100%' },
+  imageButton: {
+    alignSelf: 'center',
+    minHeight: 42,
+    paddingHorizontal: 20,
+    borderRadius: 21,
+    backgroundColor: '#050505',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  imageButtonText: { color: '#FFFFFF', fontWeight: '700' },
   suggest: { marginHorizontal: -20, marginTop: -6, marginBottom: 6 },
   twoCols: { flexDirection: 'row', gap: 12 },
   col: { flex: 1 },

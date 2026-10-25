@@ -4,18 +4,19 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const passport = require('./config/passport');
 const swaggerUi = require('swagger-ui-express');
-const { clientOrigin, nodeEnv } = require('./config/env');
+const { nodeEnv } = require('./config/env');
 const swaggerDocument = require('./config/swagger');
 const adminRoutes = require('./routes/adminRoutes');
 const authRoutes = require('./routes/authRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const productRoutes = require('./routes/productRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
 
 app.disable('x-powered-by');
 app.use(helmet());
-app.use(cors({ origin: clientOrigin }));
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(nodeEnv === 'production' ? 'combined' : 'dev'));
@@ -28,6 +29,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/products', productRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

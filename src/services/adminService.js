@@ -10,7 +10,8 @@
  * transaction: nếu khách và admin ghi vào cùng một bản ghi trong cùng một
  * khoảnh khắc, bản ghi sau cùng sẽ thắng.
  */
-import { api } from './api';
+import { api, backendApi, BASE_URL } from './api';
+import { getAuthToken } from './authToken';
 import { removeHandbag, upsertHandbag } from './handbagStore';
 import { OrderError, restoreOrderStock } from './orderService';
 import { feedbackId } from '../utils/feedback';
@@ -18,8 +19,30 @@ import { toPublicUser } from './userService';
 import { nextStatuses } from '../utils/orders';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
-const handbagPath = (id) => `handbags/${encodeURIComponent(id)}`;
+const handbagPath = (id) => `api/admin/products/${encodeURIComponent(id)}`;
 const userPath = (id) => `users/${encodeURIComponent(id)}`;
+
+export async function uploadProductImage(uri, contentType) {
+  const image = await (await fetch(uri)).blob();
+  const token = await getAuthToken();
+  const response = await fetch(
+    `${process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL}/api/admin/products/image-upload/proxy`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer ' + token,
+        'Content-Type': contentType,
+      },
+      body: image,
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Image upload failed with status ${response.status}.`);
+  }
+  const uploaded = await response.json();
+  return { imageKey: uploaded.key, uri: uploaded.uri };
+}
 
 // ---------------------------------------------------------------------------
 // Dữ liệu người dùng + đơn hàng (có bộ nhớ đệm ngắn để chuyển tab không phải chờ)
@@ -86,6 +109,7 @@ const PRODUCT_FIELDS = [
   'uri',
   'stock',
   'status',
+  'imageKey',
 ];
 
 // Chỉ nhận các trường sản phẩm hợp lệ (không để lọt id, feedbacks...)
@@ -99,7 +123,8 @@ function pickProduct(data) {
 
 /** Tạo sản phẩm mới. */
 export async function createHandbag(data) {
-  const created = await api.post('handbags', { feedbacks: [], ...pickProduct(data) });
+  const response = await backendApi.post('api/admin/products', pickProduct(data));
+  const created = response.product;
   upsertHandbag(created);
   return created;
 }
@@ -107,15 +132,15 @@ export async function createHandbag(data) {
 /** Sửa sản phẩm: chỉ ghi đè các trường được truyền vào, giữ nguyên phần còn lại (feedbacks...). */
 export async function updateHandbag(id, data) {
   const path = handbagPath(id);
-  const record = await api.get(path);
-  const saved = await api.put(path, { ...record, ...pickProduct(data) });
+  const record = (await backendApi.get(path)).product;
+  const saved = (await backendApi.patch(path, { ...record, ...pickProduct(data) })).product;
   upsertHandbag(saved);
   return saved;
 }
 
 /** Xóa hẳn sản phẩm (muốn giữ lại thì chuyển status sang 'archived'). */
 export async function deleteHandbag(id) {
-  await api.delete(handbagPath(id));
+  await backendApi.delete(handbagPath(id));
   removeHandbag(id);
 }
 
