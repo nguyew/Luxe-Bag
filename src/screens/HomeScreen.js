@@ -178,6 +178,8 @@ export default function HomeScreen({ navigation }) {
           onPress={() => navigation.navigate('Search')}
           style={styles.headerButton}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Search handbags"
         >
           <Ionicons name="search-outline" size={24} color="#1A1A1A" />
         </Pressable>

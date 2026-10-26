@@ -511,11 +511,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#E7E3DF',
   },
-  pickThumbFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   pickInfo: {
     flex: 1,
     marginLeft: 12,

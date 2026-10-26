@@ -50,6 +50,16 @@ export default function OrdersScreen({ navigation }) {
     setRefreshing(false);
   }, [load]);
 
+  // Hàm ổn định -> OrderRow (React.memo) không vẽ lại khi danh sách đổi nhỏ
+  const openOrder = useCallback(
+    (order) => navigation.navigate('OrderDetail', { orderId: order.id, order }),
+    [navigation]
+  );
+  const renderItem = useCallback(
+    ({ item }) => <OrderRow order={item} onPress={openOrder} />,
+    [openOrder]
+  );
+
   if (!isLoggedIn) {
     return (
       <View style={styles.screen}>
@@ -113,20 +123,22 @@ export default function OrdersScreen({ navigation }) {
             </Pressable>
           </View>
         }
-        renderItem={({ item }) => <OrderRow order={item} onPress={() => navigation.navigate('OrderDetail', { orderId: item.id, order: item })} />}
+        renderItem={renderItem}
+        initialNumToRender={8}
+        windowSize={7}
       />
     </View>
   );
 }
 
-function OrderRow({ order, onPress }) {
+const OrderRow = React.memo(function OrderRow({ order, onPress }) {
   const items = Array.isArray(order.items) ? order.items : [];
   const count = items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
   const extra = items.length - 3;
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onPress(order)}
       style={styles.card}
       accessibilityRole="button"
       accessibilityLabel={`Order ${order.id}`}
@@ -156,7 +168,7 @@ function OrderRow({ order, onPress }) {
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F3F1F1' },

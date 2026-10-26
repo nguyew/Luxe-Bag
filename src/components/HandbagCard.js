@@ -143,12 +143,6 @@ const styles = StyleSheet.create({
     aspectRatio: 2.3, // thẻ ngang
   },
 
-  imageFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
   // Nút yêu thích (ô vuông bo góc, nền tối mờ)
   favoriteButton: {
     position: 'absolute',
