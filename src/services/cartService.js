@@ -1,123 +1,215 @@
 /**
- * cartService – giỏ hàng của từng tài khoản, lưu trên thiết bị (AsyncStorage).
+ * cartService – giỏ hàng đồng bộ theo tài khoản qua LuxeBag Backend.
  *
- * Chỉ lưu { id, qty }: tên, ảnh, giá, tồn kho luôn lấy từ kho dữ liệu túi xách
- * (handbagStore) nên không bao giờ cũ. Khách chưa đăng nhập không có giỏ.
- * Kho dùng chung (useSyncExternalStore): thêm ở Detail thì tab Cart và
- * huy hiệu số lượng cập nhật ngay.
+ * Frontend vẫn cập nhật state đồng bộ để UI phản hồi ngay, đồng thời lưu cache
+ * trên thiết bị và đẩy snapshot lên /api/cart. Backend/MongoDB là nguồn dữ liệu
+ * chính để người dùng lấy lại giỏ hàng khi đăng nhập trên thiết bị khác.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { backendApi } from './api';
 
-const KEY_PREFIX = '@luxebag/cart';
+const KEY_PREFIX = '@luxebag/cart-cache';
+const CART_ENDPOINT = 'api/cart';
+const MAX_PER_LINE = 10;
 
-let ownerKey = null; // null = chưa đăng nhập
-let loadToken = 0;
-let state = { items: [], ready: false };
-
+let ownerId = null;
+let ownerKey = null;
+let ownerGeneration = 0;
+let syncQueue = Promise.resolve();
+let refreshTimer = null;
+let state = { items: [], ready: false, syncStatus: 'idle' };
 const listeners = new Set();
 
 function setState(patch) {
   state = { ...state, ...patch };
   listeners.forEach((listener) => {
-    try {
-      listener();
-    } catch {
-      // một listener lỗi không được làm hỏng các listener khác
-    }
+    try { listener(); } catch { /* Một listener lỗi không làm hỏng listener khác. */ }
   });
 }
 
 export const getSnapshot = () => state;
-
 export function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-function persist(items) {
-  if (!ownerKey) return;
-  AsyncStorage.setItem(ownerKey, JSON.stringify(items)).catch(() => {});
+function sanitize(raw) {
+  if (!Array.isArray(raw)) return [];
+  const quantities = new Map();
+  raw.forEach((entry) => {
+    const id = entry?.id !== undefined && entry?.id !== null ? String(entry.id).trim() : '';
+    const qty = Math.floor(Number(entry?.qty));
+    if (!id || !Number.isFinite(qty) || qty < 1) return;
+    quantities.set(id, Math.min(MAX_PER_LINE, (quantities.get(id) || 0) + qty));
+  });
+  return [...quantities.entries()].map(([id, qty]) => ({ id, qty }));
+}
+
+async function saveLocalCache(key, items) {
+  if (!key) return;
+  try { await AsyncStorage.setItem(key, JSON.stringify(items)); } catch { /* Cache không phải nguồn dữ liệu chính. */ }
+}
+
+async function readLocalCache(key) {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return sanitize(raw ? JSON.parse(raw) : []);
+  } catch {
+    return [];
+  }
+}
+
+function queueRemoteSave(items, expectedOwner, expectedGeneration) {
+  if (!expectedOwner) return;
+  const snapshot = sanitize(items);
+  syncQueue = syncQueue
+    .catch(() => {})
+    .then(async () => {
+      // Bỏ qua các lần lưu đang chờ của tài khoản đã đăng xuất/đổi tài khoản.
+      if (ownerId !== expectedOwner || ownerGeneration !== expectedGeneration) return;
+      setState({ syncStatus: 'syncing' });
+      try {
+        const response = await backendApi.put(CART_ENDPOINT, { items: snapshot });
+        if (!Array.isArray(response?.items)) throw new Error('Unexpected cart response from the server.');
+        if (ownerId === expectedOwner && ownerGeneration === expectedGeneration) {
+          setState({ syncStatus: 'synced' });
+        }
+      } catch (error) {
+        if (ownerId === expectedOwner && ownerGeneration === expectedGeneration) {
+          setState({ syncStatus: 'error', syncError: error?.message || 'Could not sync cart.' });
+        }
+      }
+    });
+  return syncQueue;
 }
 
 function commit(items) {
-  setState({ items });
-  persist(items);
+  const cleaned = sanitize(items);
+  setState({ items: cleaned, syncStatus: ownerId ? 'syncing' : 'idle', syncError: null });
+  if (ownerKey) saveLocalCache(ownerKey, cleaned);
+  if (ownerId) queueRemoteSave(cleaned, ownerId, ownerGeneration);
 }
 
-// Đọc giỏ đã lưu, bỏ mục hỏng
-function sanitize(raw) {
-  if (!Array.isArray(raw)) return [];
-  const seen = new Set();
-  const result = [];
-  raw.forEach((entry) => {
-    const id = entry && entry.id !== undefined && entry.id !== null ? String(entry.id) : '';
-    const qty = Math.floor(Number(entry?.qty));
-    if (!id || seen.has(id) || !(qty >= 1)) return;
-    seen.add(id);
-    result.push({ id, qty });
-  });
-  return result;
+/**
+ * Đổi chủ giỏ khi đăng nhập/đăng xuất.
+ * Khi đăng nhập, ưu tiên giỏ từ Backend; cache cục bộ chỉ dùng tạm khi mạng lỗi.
+ */
+async function refreshRemoteCart(expectedOwner, expectedGeneration) {
+  if (!expectedOwner || ownerId !== expectedOwner || ownerGeneration !== expectedGeneration) return;
+  // Do not overwrite local edits while a write is pending or has failed.
+  if (state.syncStatus !== 'synced') return;
+  try {
+    const response = await backendApi.get(CART_ENDPOINT);
+    if (!Array.isArray(response?.items)) throw new Error('Unexpected cart response from the server.');
+    if (ownerId !== expectedOwner || ownerGeneration !== expectedGeneration || state.syncStatus !== 'synced') return;
+    const items = sanitize(response.items);
+    if (JSON.stringify(items) !== JSON.stringify(state.items)) {
+      setState({ items, syncStatus: 'synced', syncError: null });
+      await saveLocalCache(ownerKey, items);
+    }
+  } catch {
+    // Keep the current view; a later poll can recover from transient network errors.
+  }
 }
 
-/** Đổi chủ giỏ hàng (gọi khi đăng nhập / đăng xuất). ownerId = null -> không có giỏ. */
-export async function setCartOwner(ownerId) {
-  const token = ++loadToken;
-  ownerKey = ownerId ? `${KEY_PREFIX}:${String(ownerId)}` : null;
+export async function setCartOwner(nextOwnerId) {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  const generation = ++ownerGeneration;
+  ownerId = nextOwnerId ? String(nextOwnerId) : null;
+  ownerKey = ownerId ? `${KEY_PREFIX}:${ownerId}` : null;
 
-  if (!ownerKey) {
-    setState({ items: [], ready: true });
+  if (!ownerId) {
+    setState({ items: [], ready: true, syncStatus: 'idle', syncError: null });
     return;
   }
 
-  setState({ items: [], ready: false });
-  let items = [];
+  const requestedOwner = ownerId;
+  const cacheKey = ownerKey;
+  setState({ items: [], ready: false, syncStatus: 'syncing', syncError: null });
+
   try {
-    const raw = await AsyncStorage.getItem(ownerKey);
-    items = sanitize(raw ? JSON.parse(raw) : []);
-  } catch {
-    // giỏ hỏng -> coi như rỗng
+    const response = await backendApi.get(CART_ENDPOINT);
+    if (!Array.isArray(response?.items)) throw new Error('Unexpected cart response from the server.');
+    const items = sanitize(response.items);
+    if (ownerId !== requestedOwner || ownerGeneration !== generation) return;
+    setState({ items, ready: true, syncStatus: 'synced', syncError: null });
+    await saveLocalCache(cacheKey, items);
+    // Keep an already-open session up to date when another device edits the cart.
+    refreshTimer = setInterval(() => refreshRemoteCart(requestedOwner, generation), 15000);
+  } catch (error) {
+    // Giữ trải nghiệm offline, nhưng đánh dấu rõ rằng dữ liệu chưa được xác nhận từ server.
+    const cachedItems = await readLocalCache(cacheKey);
+    if (ownerId !== requestedOwner || ownerGeneration !== generation) return;
+    setState({
+      items: cachedItems,
+      ready: true,
+      syncStatus: 'error',
+      syncError: error?.message || 'Could not load the cart from the server.',
+    });
+    // Retry loading when connectivity returns. Do not overwrite unsynced local edits.
+    refreshTimer = setInterval(async () => {
+      if (ownerId !== requestedOwner || ownerGeneration !== generation || state.syncStatus !== 'error') return;
+      try {
+        const response = await backendApi.get(CART_ENDPOINT);
+        if (!Array.isArray(response?.items)) return;
+        if (ownerId !== requestedOwner || ownerGeneration !== generation || state.syncStatus !== 'error') return;
+        const items = sanitize(response.items);
+        setState({ items, syncStatus: 'synced', syncError: null });
+        await saveLocalCache(cacheKey, items);
+      } catch { /* Retry on the next interval. */ }
+    }, 15000);
   }
-  if (token === loadToken) setState({ items, ready: true });
 }
 
-/** Cộng thêm `qty` cho món (tạo mới nếu chưa có). `max` = số lượng tối đa cho phép. */
+/** Cộng thêm qty cho sản phẩm (tạo dòng mới nếu chưa có). */
 export function cartAdd(id, qty = 1, max = Infinity) {
-  if (!ownerKey) return;
-  const key = String(id);
-  const existing = state.items.find((item) => item.id === key);
+  if (!ownerId) return;
+  const key = String(id ?? '').trim();
+  const amount = Math.floor(Number(qty));
+  if (!key || !Number.isFinite(amount) || amount < 1) return;
+  const safeMax = Math.min(MAX_PER_LINE, Number.isFinite(Number(max)) ? Number(max) : MAX_PER_LINE);
+  if (safeMax < 1) return;
 
+  const existing = state.items.find((item) => item.id === key);
   if (existing) {
-    const next = Math.min(existing.qty + qty, max);
+    const next = Math.min(existing.qty + amount, safeMax);
     if (next === existing.qty) return;
-    commit(state.items.map((item) => (item.id === key ? { ...item, qty: next } : item)));
+    commit(state.items.map((item) => item.id === key ? { ...item, qty: next } : item));
   } else {
-    const first = Math.min(qty, max);
-    if (!(first >= 1)) return;
-    commit([...state.items, { id: key, qty: first }]);
+    commit([...state.items, { id: key, qty: Math.min(amount, safeMax) }]);
   }
 }
 
-/** Đặt số lượng cụ thể (>= 1). Muốn xóa thì dùng cartRemove. */
+/** Đặt số lượng cụ thể; muốn xóa thì dùng cartRemove. */
 export function cartSetQty(id, qty) {
+  if (!ownerId) return;
   const key = String(id);
   const value = Math.floor(Number(qty));
-  if (!(value >= 1)) return;
+  if (!Number.isFinite(value) || value < 1) return;
   if (!state.items.some((item) => item.id === key)) return;
-  commit(state.items.map((item) => (item.id === key ? { ...item, qty: value } : item)));
+  commit(state.items.map((item) => item.id === key ? { ...item, qty: Math.min(value, MAX_PER_LINE) } : item));
 }
 
 export function cartRemove(id) {
+  if (!ownerId) return;
   const key = String(id);
   if (!state.items.some((item) => item.id === key)) return;
   commit(state.items.filter((item) => item.id !== key));
 }
 
 export function cartClear() {
-  if (state.items.length === 0) return;
+  if (!ownerId || state.items.length === 0) return;
   commit([]);
 }
 
-/** Thay toàn bộ giỏ (dùng khi "sửa lỗi giỏ hàng": bỏ món hết hàng, hạ số lượng). */
+/** Thay toàn bộ giỏ (ví dụ bỏ sản phẩm hết hàng hoặc sửa số lượng vượt tồn kho). */
 export function cartReplace(items) {
+  if (!ownerId) return;
   commit(sanitize(items));
+}
+
+/** Chờ lần đồng bộ đã xếp hàng gần nhất hoàn tất (hữu ích cho kiểm thử/checkout). */
+export async function waitForCartSync() {
+  await syncQueue.catch(() => {});
+  return state.syncStatus === 'synced';
 }

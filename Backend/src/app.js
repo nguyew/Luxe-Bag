@@ -13,6 +13,7 @@ const productRoutes = require('./routes/productRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const couponRoutes = require('./routes/couponRoutes');
+const cartRoutes = require('./routes/cartRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -36,6 +37,7 @@ app.use('/api/products/:productId/reviews', reviewRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/cart', cartRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
