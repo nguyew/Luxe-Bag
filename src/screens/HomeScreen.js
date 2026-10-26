@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import HandbagCard from '../components/HandbagCard';
 import useFavorites from '../hooks/useFavorites';
 import useHandbags from '../hooks/useHandbags';
+import { formatBrand } from '../utils/format';
 
 // Khối thông báo lỗi / danh sách rỗng, có nút thử lại
 function StateMessage({ icon, title, message, actionLabel, onAction }) {
@@ -35,7 +37,14 @@ export default function HomeScreen({ navigation }) {
   // Dữ liệu dùng chung với Search/Stylist/Favorites; có sẵn bản lưu trên máy nên
   // mở app là thấy ngay, mất mạng vẫn xem được bộ sưu tập đã tải.
   const { items: handbags, loading, error, reload, revalidate } = useHandbags();
+
+  // Bộ lọc & Sắp xếp chuyên nghiệp (All, Women, Men, Top Sales, Price, Brand)
+  const [genderFilter, setGenderFilter] = useState('all'); // 'all' | 'women' | 'men'
+  const [sortTab, setSortTab] = useState('default'); // 'default' | 'sales' | 'price'
+  const [priceDirection, setPriceDirection] = useState('desc'); // 'desc' | 'asc'
   const [selectedBrand, setSelectedBrand] = useState('All');
+  const [brandModalVisible, setBrandModalVisible] = useState(false);
+
   const [pulling, setPulling] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
 
@@ -60,7 +69,17 @@ export default function HomeScreen({ navigation }) {
         .map((item) => String(item.brand || '').trim())
         .filter(Boolean)
     );
-    return ['All', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
+    return ['All', ...Array.from(unique).sort((a, b) => formatBrand(a).localeCompare(formatBrand(b)))];
+  }, [handbags]);
+
+  // Đếm số lượng sản phẩm của từng thương hiệu
+  const brandCounts = useMemo(() => {
+    const map = { All: handbags.length };
+    handbags.forEach((item) => {
+      const b = String(item.brand || '').trim();
+      if (b) map[b] = (map[b] || 0) + 1;
+    });
+    return map;
   }, [handbags]);
 
   // Brand đang chọn không còn trong dữ liệu mới -> quay về "All"
@@ -68,18 +87,54 @@ export default function HomeScreen({ navigation }) {
     if (!brands.includes(selectedBrand)) setSelectedBrand('All');
   }, [brands, selectedBrand]);
 
-  // Lọc theo brand đang chọn, rồi sắp xếp giá giảm dần (theo đề bài)
-  const filteredProducts = useMemo(() => {
-    const byBrand =
-      selectedBrand === 'All'
-        ? handbags
-        : handbags.filter(
-            (item) => String(item.brand || '').trim() === selectedBrand
-          );
+  // Toggle chiều sắp xếp giá
+  const handlePriceToggle = () => {
+    if (sortTab === 'price') {
+      setPriceDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSortTab('price');
+      setPriceDirection('desc');
+    }
+  };
 
-    // Copy mảng trước khi sort để không làm đổi state gốc
-    return [...byBrand].sort((a, b) => Number(b.cost) - Number(a.cost));
-  }, [handbags, selectedBrand]);
+  // Lọc theo brand đang chọn, giới tính (All/Women/Men), rồi sắp xếp theo tab
+  const filteredProducts = useMemo(() => {
+    let result = [...handbags];
+
+    // 1. Lọc theo Brand
+    if (selectedBrand !== 'All') {
+      result = result.filter(
+        (item) => String(item.brand || '').trim() === selectedBrand
+      );
+    }
+
+    // 2. Lọc theo Giới tính: All | Women | Men
+    if (genderFilter === 'women') {
+      result = result.filter((item) => item.gender === true);
+    } else if (genderFilter === 'men') {
+      result = result.filter((item) => item.gender === false);
+    }
+
+    // 3. Sắp xếp theo sortTab
+    if (sortTab === 'sales') {
+      result.sort((a, b) => {
+        const scoreB = (b.feedbacks?.length || 0) + (b.stock !== undefined ? Math.max(0, 10 - b.stock) : 0);
+        const scoreA = (a.feedbacks?.length || 0) + (a.stock !== undefined ? Math.max(0, 10 - a.stock) : 0);
+        return scoreB - scoreA;
+      });
+    } else if (sortTab === 'price') {
+      if (priceDirection === 'asc') {
+        result.sort((a, b) => Number(a.cost || 0) - Number(b.cost || 0));
+      } else {
+        result.sort((a, b) => Number(b.cost || 0) - Number(a.cost || 0));
+      }
+    } else {
+      // Mặc định: sắp xếp theo giá giảm dần (Assignment 1 Requirement)
+      result.sort((a, b) => Number(b.cost || 0) - Number(a.cost || 0));
+    }
+
+    return result;
+  }, [handbags, selectedBrand, genderFilter, sortTab, priceDirection]);
 
   // Gom thành các hàng cho FlatList: 2 thẻ đứng -> 1 thẻ rộng -> lặp lại
   const rows = useMemo(() => {
@@ -204,34 +259,252 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.heroBold}>Built for life.</Text>
       </View>
 
+      {/* Thanh bộ lọc & Sắp xếp chuyên nghiệp (All, Women, Men, Top Sales, Price, Brand) */}
       {handbags.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryList}
-        >
-          {brands.map((brand) => {
-            const active = selectedBrand === brand;
-
-            return (
-              <Pressable
-                key={brand}
-                onPress={() => setSelectedBrand(brand)}
-                style={[styles.categoryChip, active && styles.activeChip]}
+        <View style={styles.filterBarContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterTabsRow}
+          >
+            {/* Tab: All */}
+            <Pressable
+              onPress={() => setGenderFilter('all')}
+              style={[
+                styles.sortTab,
+                genderFilter === 'all' && styles.sortTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortTabText,
+                  genderFilter === 'all' && styles.sortTabTextActive,
+                ]}
               >
-                <Text
-                  style={[
-                    styles.categoryText,
-                    active && styles.activeChipText,
-                  ]}
+                All
+              </Text>
+            </Pressable>
+
+            {/* Tab: Women */}
+            <Pressable
+              onPress={() => setGenderFilter('women')}
+              style={[
+                styles.sortTab,
+                genderFilter === 'women' && styles.sortTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortTabText,
+                  genderFilter === 'women' && styles.sortTabTextActive,
+                ]}
+              >
+                Women
+              </Text>
+            </Pressable>
+
+            {/* Tab: Men */}
+            <Pressable
+              onPress={() => setGenderFilter('men')}
+              style={[
+                styles.sortTab,
+                genderFilter === 'men' && styles.sortTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortTabText,
+                  genderFilter === 'men' && styles.sortTabTextActive,
+                ]}
+              >
+                Men
+              </Text>
+            </Pressable>
+
+            {/* Tab: Top Sales */}
+            <Pressable
+              onPress={() =>
+                setSortTab((prev) => (prev === 'sales' ? 'default' : 'sales'))
+              }
+              style={[
+                styles.sortTab,
+                sortTab === 'sales' && styles.sortTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortTabText,
+                  sortTab === 'sales' && styles.sortTabTextActive,
+                ]}
+              >
+                Top Sales
+              </Text>
+            </Pressable>
+
+            {/* Tab: Price (Toggle Thấp -> Cao, Cao -> Thấp) */}
+            <Pressable
+              onPress={handlePriceToggle}
+              style={[
+                styles.sortTab,
+                styles.sortTabWithIcon,
+                sortTab === 'price' && styles.sortTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortTabText,
+                  sortTab === 'price' && styles.sortTabTextActive,
+                ]}
+              >
+                Price
+              </Text>
+              <Ionicons
+                name={
+                  sortTab === 'price' && priceDirection === 'asc'
+                    ? 'chevron-up'
+                    : 'chevron-down'
+                }
+                size={14}
+                color={sortTab === 'price' ? '#FFFFFF' : '#4A4540'}
+                style={styles.tabIcon}
+              />
+            </Pressable>
+
+            {/* Tab: Brand Dropdown Button */}
+            <Pressable
+              onPress={() => setBrandModalVisible(true)}
+              style={[
+                styles.sortTab,
+                styles.sortTabWithIcon,
+                selectedBrand !== 'All' && styles.sortTabBrandActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sortTabText,
+                  selectedBrand !== 'All' && styles.sortTabTextBrandActive,
+                ]}
+                numberOfLines={1}
+              >
+                {selectedBrand === 'All' ? 'Brand' : formatBrand(selectedBrand)}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={14}
+                color={selectedBrand !== 'All' ? '#EE4D2D' : '#4A4540'}
+                style={styles.tabIcon}
+              />
+            </Pressable>
+          </ScrollView>
+
+          {/* Dòng hiển thị nhãn lọc đang hoạt động */}
+          {(selectedBrand !== 'All' || genderFilter !== 'all') && (
+            <View style={styles.activeFilterRow}>
+              <Text style={styles.activeFilterLabel}>Filtered by:</Text>
+              {genderFilter !== 'all' && (
+                <Pressable
+                  onPress={() => setGenderFilter('all')}
+                  style={styles.activeFilterChip}
                 >
-                  {brand}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                  <Text style={styles.activeFilterChipText}>
+                    {genderFilter === 'women' ? 'Women' : 'Men'}
+                  </Text>
+                  <Ionicons name="close-circle" size={14} color="#EE4D2D" />
+                </Pressable>
+              )}
+              {selectedBrand !== 'All' && (
+                <Pressable
+                  onPress={() => setSelectedBrand('All')}
+                  style={styles.activeFilterChip}
+                >
+                  <Text style={styles.activeFilterChipText}>
+                    {formatBrand(selectedBrand)}
+                  </Text>
+                  <Ionicons name="close-circle" size={14} color="#EE4D2D" />
+                </Pressable>
+              )}
+              <Text style={styles.activeFilterCount}>
+                ({filteredProducts.length} {filteredProducts.length === 1 ? 'item' : 'items'})
+              </Text>
+            </View>
+          )}
+        </View>
       )}
+
+      {/* Modal Dropdown chọn Brand */}
+      <Modal
+        visible={brandModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBrandModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setBrandModalVisible(false)}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Select Brand</Text>
+                <Text style={styles.modalSub}>Filter products by brand</Text>
+              </View>
+              <Pressable
+                onPress={() => setBrandModalVisible(false)}
+                style={styles.modalCloseBtn}
+                hitSlop={8}
+              >
+                <Ionicons name="close" size={20} color="#1A1A1A" />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.brandListScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {brands.map((brand) => {
+                const isSelected = selectedBrand === brand;
+                const count = brandCounts[brand] || 0;
+                return (
+                  <Pressable
+                    key={brand}
+                    style={[
+                      styles.brandItem,
+                      isSelected && styles.brandItemSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedBrand(brand);
+                      setBrandModalVisible(false);
+                    }}
+                  >
+                    <View style={styles.brandItemLeft}>
+                      <Ionicons
+                        name={
+                          isSelected
+                            ? 'checkmark-circle'
+                            : 'ellipse-outline'
+                        }
+                        size={18}
+                        color={isSelected ? '#EE4D2D' : '#B5AEA8'}
+                      />
+                      <Text
+                        style={[
+                          styles.brandItemText,
+                          isSelected && styles.brandItemTextSelected,
+                        ]}
+                      >
+                        {brand === 'All' ? 'All Brands' : formatBrand(brand)}
+                      </Text>
+                    </View>
+                    <View style={styles.brandCountBadge}>
+                      <Text style={styles.brandCountText}>{count}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </>
   );
 
@@ -263,7 +536,7 @@ export default function HomeScreen({ navigation }) {
     );
   } else {
     emptyContent = (
-      <Text style={styles.emptyText}>No handbags for this brand.</Text>
+      <Text style={styles.emptyText}>No handbags match your selection.</Text>
     );
   }
 
@@ -361,34 +634,182 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // Category chips
-  categoryList: {
-    gap: 6,
-    paddingBottom: 22,
-    alignItems: 'center',
+  // Professional Filter Bar & Sort Tabs
+  filterBarContainer: {
+    marginBottom: 16,
   },
-
-  categoryChip: {
-    minHeight: 32,
-    paddingHorizontal: 16,
-    borderRadius: 18,
+  filterTabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  sortTab: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
-
-  activeChip: {
-    backgroundColor: '#050505',
+  sortTabActive: {
+    backgroundColor: '#EE4D2D',
+    borderColor: '#EE4D2D',
   },
-
-  categoryText: {
+  sortTabText: {
     fontSize: 13,
-    color: '#55514C',
+    fontWeight: '500',
+    color: '#333333',
+  },
+  sortTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  sortTabWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tabIcon: {
+    marginLeft: 2,
+  },
+  sortTabBrandActive: {
+    backgroundColor: '#FFF5F2',
+    borderColor: '#EE4D2D',
+  },
+  sortTabTextBrandActive: {
+    color: '#EE4D2D',
+    fontWeight: '700',
   },
 
-  activeChipText: {
-    color: '#FFFFFF',
+  // Active Filter Indicator
+  activeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 2,
+  },
+  activeFilterLabel: {
+    fontSize: 12,
+    color: '#77716A',
+    fontWeight: '500',
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFEBE6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FFD2C8',
+  },
+  activeFilterChipText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: '#EE4D2D',
+  },
+  activeFilterCount: {
+    fontSize: 12,
+    color: '#8A8580',
+  },
+
+  // Modal Dropdown for Brand Selection
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxHeight: '75%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0ECE8',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  modalSub: {
+    fontSize: 12,
+    color: '#77716A',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F5F3F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandListScroll: {
+    maxHeight: 320,
+  },
+  brandItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  brandItemSelected: {
+    backgroundColor: '#FFF5F2',
+  },
+  brandItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  brandItemText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333333',
+  },
+  brandItemTextSelected: {
+    color: '#EE4D2D',
+    fontWeight: '700',
+  },
+  brandCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#F0ECE8',
+  },
+  brandCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#77716A',
   },
 
   // Product grid

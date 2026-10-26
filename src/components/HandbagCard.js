@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemoteImage from './RemoteImage';
-import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
+import { formatBrand, formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 import { isPurchasable } from '../utils/catalog';
 
 /**
@@ -27,7 +27,7 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
     <Pressable
       onPress={() => onOpen?.(item)}
       accessibilityRole="button"
-      accessibilityLabel={`${item.handbagName}, ${item.brand || ''}, ${formatPrice(item.cost)}`}
+      accessibilityLabel={`${item.handbagName}, ${formatBrand(item.brand) || ''}, ${formatPrice(item.cost)}`}
       style={[
         styles.productCard,
         wide ? styles.wideCard : styles.squareCard,
@@ -101,7 +101,7 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
         <View style={[styles.captionLeft, !wide && styles.captionLeftStacked]}>
           {!!item.brand && (
             <Text style={styles.productCaptionBrand} numberOfLines={1}>
-              {item.brand}
+              {formatBrand(item.brand)}
             </Text>
           )}
           <Text style={styles.productCaptionName} numberOfLines={2}>

@@ -21,7 +21,14 @@ const TIMEOUT_MS = 10000;
 
 // fetch có giới hạn thời gian; lỗi mạng, quá hạn hay HTTP lỗi đều ném Error
 async function request(path, { method = 'GET', body, baseUrl = BASE_URL, auth = false } = {}) {
-  if (!baseUrl) {
+  // Tự động giải quyết localhost thành IP máy tính để điện thoại thật luôn kết nối được
+  const resolvedBaseUrl = (baseUrl || BASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace('localhost', '192.168.101.18')
+    .replace('127.0.0.1', '192.168.101.18');
+
+  if (!resolvedBaseUrl) {
     throw new Error(
       'Missing EXPO_PUBLIC_API_URL. Add it to your .env file and restart Expo.'
     );
@@ -40,7 +47,7 @@ async function request(path, { method = 'GET', body, baseUrl = BASE_URL, auth = 
       const token = await getAuthToken();
       if (token) headers.Authorization = 'Bearer ' + token;
     }
-    const response = await fetch(`${baseUrl}/${path}`, {
+    const response = await fetch(`${resolvedBaseUrl}/${path}`, {
       method,
       headers,
       body: hasBody ? JSON.stringify(body) : undefined,
