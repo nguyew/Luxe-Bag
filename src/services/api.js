@@ -1,37 +1,57 @@
 /**
- * api.js – gọi MockAPI (mockapi.io).
+ * API clients for LuxeBag.
  *
- * Địa chỉ gốc đọc từ file .env ở thư mục gốc của project:
- *   EXPO_PUBLIC_API_URL=https://abc123.mockapi.io
- * (nếu lỡ dán thêm "/handbags" ở cuối thì code tự bỏ đi).
- * Sửa .env xong phải khởi động lại: npx expo start -c
+ * MockAPI (legacy resources such as handbags/users):
+ *   EXPO_PUBLIC_API_URL=https://your-project.mockapi.io/handbags
  *
- * Dùng chung cho mọi resource (handbags, users...):
- *   api.get('users'), api.post('users', body), api.put('users/5', body), api.delete('users/5')
- * Lỗi HTTP được ném ra kèm `error.status` (ví dụ 404) để nơi gọi xử lý riêng.
- * Lưu ý: MockAPI trả 404 khi lọc (?email=...) mà không có kết quả nào.
+ * LuxeBag Backend (Express API):
+ *   EXPO_PUBLIC_BACKEND_URL=http://YOUR_COMPUTER_LAN_IP:5000
+ *
+ * Keep these base URLs separate. Backend requests must never fall back to
+ * MockAPI when EXPO_PUBLIC_BACKEND_URL is missing.
+ * After changing .env, restart Expo with: npx expo start -c
  */
-export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || '')
-  .trim()
-  .replace(/\/+$/, '') // bỏ dấu "/" ở cuối
-  .replace(/\/handbags$/i, ''); // lỡ dán cả "/handbags" thì tự bỏ đi
 
-const RESOURCE = 'api/products';
+const trimBaseUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
+
+export const MOCK_API_URL = trimBaseUrl(process.env.EXPO_PUBLIC_API_URL)
+  .replace(/\/handbags$/i, '');
+
+export const BACKEND_URL = trimBaseUrl(process.env.EXPO_PUBLIC_BACKEND_URL);
+
+// Backwards compatibility for existing imports that use BASE_URL for MockAPI.
+export const BASE_URL = MOCK_API_URL;
+
 const TIMEOUT_MS = 10000;
 
-// fetch có giới hạn thời gian; lỗi mạng, quá hạn hay HTTP lỗi đều ném Error
-async function request(path, { method = 'GET', body, baseUrl = BASE_URL, auth = false } = {}) {
-  // Tự động giải quyết localhost thành IP máy tính để điện thoại thật luôn kết nối được
-  const resolvedBaseUrl = (baseUrl || BASE_URL || '')
-    .trim()
-    .replace(/\/+$/, '')
-    .replace('localhost', '192.168.101.18')
-    .replace('127.0.0.1', '192.168.101.18');
-
+/**
+ * Send an HTTP request to the explicitly selected API.
+ * `baseUrl` is required to be configured by the relevant client; there is no
+ * fallback between Backend and MockAPI.
+ */
+async function request(
+  path,
+  {
+    method = 'GET',
+    body,
+    baseUrl,
+    auth = false,
+    apiName = 'API',
+  } = {},
+) {
+  const resolvedBaseUrl = trimBaseUrl(baseUrl);
   if (!resolvedBaseUrl) {
+    const variableName = apiName === 'Backend'
+      ? 'EXPO_PUBLIC_BACKEND_URL'
+      : 'EXPO_PUBLIC_API_URL';
     throw new Error(
-      'Missing EXPO_PUBLIC_API_URL. Add it to your .env file and restart Expo.'
+      `Missing ${variableName}. Add it to your .env file and restart Expo.`,
     );
+  }
+
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  if (!normalizedPath) {
+    throw new Error('An API request path is required.');
   }
 
   const hasBody = body !== undefined;
@@ -39,31 +59,56 @@ async function request(path, { method = 'GET', body, baseUrl = BASE_URL, auth = 
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const headers = hasBody
-      ? { Accept: 'application/json', 'Content-Type': 'application/json' }
-      : { Accept: 'application/json' };
+    const headers = {
+      Accept: 'application/json',
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    };
+
     if (auth) {
       const { getAuthToken } = await import('./authToken');
       const token = await getAuthToken();
-      if (token) headers.Authorization = 'Bearer ' + token;
+      if (token) headers.Authorization = `Bearer ${token}`;
     }
-    const response = await fetch(`${resolvedBaseUrl}/${path}`, {
+
+    const response = await fetch(`${resolvedBaseUrl}/${normalizedPath}`, {
       method,
       headers,
       body: hasBody ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
 
+    const responseText = await response.text();
+    let responseData = null;
+    let validJson = true;
+
+    if (responseText) {
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        // Some error responses (for example a reverse proxy error) may be
+        // plain text or HTML. Keep the HTTP status available to callers.
+        responseData = null;
+        validJson = false;
+      }
+    }
+
     if (!response.ok) {
-      const error = new Error(`Request failed with status ${response.status}`);
+      const message = responseData?.message
+        || responseData?.error
+        || `Request failed with status ${response.status}`;
+      const error = new Error(message);
       error.status = response.status;
+      error.data = responseData;
       throw error;
     }
 
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
+    if (responseText && !validJson) {
+      throw new Error('The server returned an invalid JSON response.');
+    }
+
+    return responseData;
   } catch (error) {
-    if (error.name === 'AbortError') {
+    if (error?.name === 'AbortError') {
       const timeout = new Error('The request timed out. Please try again.');
       timeout.code = 'timeout';
       throw timeout;
@@ -74,26 +119,58 @@ async function request(path, { method = 'GET', body, baseUrl = BASE_URL, auth = 
   }
 }
 
+// Legacy MockAPI client. Use only for features that have not been migrated yet.
 export const api = {
-  get: (path) => request(path),
-  post: (path, body) => request(path, { method: 'POST', body }),
-  put: (path, body) => request(path, { method: 'PUT', body }),
-  delete: (path) => request(path, { method: 'DELETE' }),
+  get: (path) => request(path, {
+    baseUrl: MOCK_API_URL,
+    apiName: 'MockAPI',
+  }),
+  post: (path, body) => request(path, {
+    method: 'POST', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  }),
+  put: (path, body) => request(path, {
+    method: 'PUT', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  }),
+  patch: (path, body) => request(path, {
+    method: 'PATCH', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  }),
+  delete: (path) => request(path, {
+    method: 'DELETE', baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  }),
 };
 
+// Express Backend client. All requests use the Backend URL and include the
+// stored JWT when available. It intentionally never falls back to MockAPI.
 export const backendApi = {
-  get: (path) => request(path, { baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
-  post: (path, body) => request(path, { method: 'POST', body, baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
-  patch: (path, body) => request(path, { method: 'PATCH', body, baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
-  delete: (path) => request(path, { method: 'DELETE', baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
+  get: (path) => request(path, {
+    baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  }),
+  post: (path, body) => request(path, {
+    method: 'POST', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  }),
+  put: (path, body) => request(path, {
+    method: 'PUT', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  }),
+  patch: (path, body) => request(path, {
+    method: 'PATCH', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  }),
+  delete: (path) => request(path, {
+    method: 'DELETE', baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  }),
 };
 
-/** Lấy toàn bộ túi xách. Ném lỗi nếu gọi thất bại (Home sẽ hiện nút "Try again"). */
+const PRODUCT_RESOURCE = 'api/products';
+
+/** Get all handbags from the Backend API. */
 export async function getHandbags() {
-  const response = await backendApi.get(RESOURCE);
-  const data = response?.products;
-  // Không trả về [] khi dữ liệu lạ: nếu vậy kho dữ liệu sẽ tưởng cửa hàng
-  // trống và ghi đè bản sao tốt đang có
-  if (!Array.isArray(data)) throw new Error('Unexpected response from the server.');
-  return data;
+  const response = await backendApi.get(PRODUCT_RESOURCE);
+  const products = response?.products;
+
+  // Do not turn an unexpected response into an empty product list: callers may
+  // otherwise overwrite a valid cached copy with empty data.
+  if (!Array.isArray(products)) {
+    throw new Error('Unexpected response from the server.');
+  }
+
+  return products;
 }
