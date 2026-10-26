@@ -1,12 +1,6 @@
-/**
- * reviewService – khách hàng viết đánh giá sản phẩm.
- *
- * Đánh giá nằm trong mảng `feedbacks` của từng túi (resource `handbags`).
- * Quy tắc: chỉ khách đã NHẬN hàng (đơn `delivered` có sản phẩm đó) mới được
- * đánh giá; mỗi khách một đánh giá cho mỗi sản phẩm (được sửa / xóa).
- */
-import { api } from './api';
-import { upsertHandbag } from './handbagStore';
+/** Customer review operations backed by the LuxeBag Express API. */
+import { backendApi } from './api';
+import { getSnapshot, upsertHandbag } from './handbagStore';
 
 export class ReviewError extends Error {
   constructor(code, message) {
@@ -17,44 +11,76 @@ export class ReviewError extends Error {
 }
 
 export function describeReviewError(error) {
-  switch (error?.code) {
+  switch (error?.code || error?.data?.code) {
     case 'invalid_input':
-      return error.message;
+      return error.message || error?.data?.error || 'Please check your review and try again.';
     case 'not_purchased':
       return 'Only customers who received this item can review it.';
     case 'not_found':
-      return 'This product is no longer available.';
+      return 'This product or review is no longer available.';
+    case 'unauthorized':
+      return 'Please sign in again to manage your review.';
     case 'network':
     default:
-      return 'Could not reach the server. Check your connection and try again.';
+      return error?.message || 'Could not reach the server. Check your connection and try again.';
   }
 }
 
 export const REVIEW_MAX_LENGTH = 500;
+const productReviewsPath = (id) => `api/products/${encodeURIComponent(id)}/reviews`;
 
-const asArray = (value) => (Array.isArray(value) ? value : []);
-const handbagPath = (id) => `handbags/${encodeURIComponent(id)}`;
-
-const newReviewId = () =>
-  `rv-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-
-/** Khách đã nhận hàng (đơn delivered) có sản phẩm này chưa? */
-export async function hasDeliveredPurchase(userId, handbagId) {
-  const record = await api.get(`users/${encodeURIComponent(userId)}`);
-  return asArray(record.orders).some(
-    (order) =>
-      order.status === 'delivered' &&
-      asArray(order.items).some((item) => String(item.handbagId) === String(handbagId))
-  );
+function toReviewError(error) {
+  if (error instanceof ReviewError) return error;
+  const code = error?.data?.code;
+  if (code) return new ReviewError(code, error?.data?.error || error.message);
+  if (error?.status === 401) return new ReviewError('unauthorized', 'Please sign in again.');
+  if (error?.status === 404) return new ReviewError('not_found');
+  return new ReviewError('network', error?.message);
 }
 
-const isOwn = (feedback, userId) =>
-  feedback && feedback.userId && String(feedback.userId) === String(userId);
+function syncProductReviews(productId, feedbacks) {
+  const current = getSnapshot().items.find((item) => String(item.id) === String(productId));
+  if (current) upsertHandbag({ ...current, feedbacks });
+}
 
-/**
- * Gửi (hoặc sửa) đánh giá của user cho một sản phẩm.
- * Nếu admin đã ẩn đánh giá cũ thì sửa xong vẫn bị ẩn (quyết định kiểm duyệt giữ nguyên).
- */
+function syncReviewIntoCache(productId, review) {
+  const current = getSnapshot().items.find((item) => String(item.id) === String(productId));
+  if (!current) return;
+  const feedbacks = Array.isArray(current.feedbacks) ? current.feedbacks : [];
+  const next = feedbacks.filter((item) => String(item.id) !== String(review.id));
+  next.push(review);
+  syncProductReviews(productId, next);
+}
+
+/** Check delivery eligibility against the authenticated user's Backend orders. */
+export async function hasDeliveredPurchase(userId, handbagId) {
+  if (!userId || !handbagId) return false;
+  try {
+    const response = await backendApi.get('api/orders/my');
+    return (Array.isArray(response?.orders) ? response.orders : []).some((order) =>
+      order.status === 'delivered' &&
+      (Array.isArray(order.items) ? order.items : []).some((item) =>
+        String(item.productId || item.handbagId || item.id) === String(handbagId)
+      )
+    );
+  } catch (error) {
+    throw toReviewError(error);
+  }
+}
+
+/** Fetch public reviews for a product and synchronize the shared product cache. */
+export async function fetchProductReviews(handbagId) {
+  try {
+    const response = await backendApi.get(productReviewsPath(handbagId));
+    const reviews = Array.isArray(response?.reviews) ? response.reviews : [];
+    syncProductReviews(handbagId, reviews);
+    return reviews;
+  } catch (error) {
+    throw toReviewError(error);
+  }
+}
+
+/** Create or update the signed-in customer's review. Eligibility is enforced by Backend. */
 export async function submitReview({ user, handbagId, rating, comment }) {
   const stars = Math.round(Number(rating));
   if (!(stars >= 1 && stars <= 5)) {
@@ -64,47 +90,33 @@ export async function submitReview({ user, handbagId, rating, comment }) {
   if (text.length > REVIEW_MAX_LENGTH) {
     throw new ReviewError('invalid_input', `Please keep your review under ${REVIEW_MAX_LENGTH} characters.`);
   }
+  if (!user?.id || !handbagId) {
+    throw new ReviewError('invalid_input', 'Please sign in and select a product first.');
+  }
 
   try {
-    const path = handbagPath(handbagId);
-    const record = await api.get(path);
-    const feedbacks = asArray(record.feedbacks);
-    const index = feedbacks.findIndex((item) => isOwn(item, user.id));
-
-    // Đánh giá mới phải đến từ người đã nhận hàng (kiểm tra trên dữ liệu mới nhất)
-    if (index < 0 && !(await hasDeliveredPurchase(user.id, handbagId))) {
-      throw new ReviewError('not_purchased');
-    }
-
-    const review = {
-      id: index >= 0 ? feedbacks[index].id : newReviewId(),
-      userId: String(user.id),
-      author: user.name,
+    const response = await backendApi.post(productReviewsPath(handbagId), {
       rating: stars,
       comment: text,
-      date: new Date().toISOString(),
-      hidden: index >= 0 ? feedbacks[index].hidden === true : false,
-    };
-    const next = index >= 0 ? feedbacks.map((item, i) => (i === index ? review : item)) : [...feedbacks, review];
-
-    upsertHandbag(await api.put(path, { ...record, feedbacks: next }));
-    return review;
+    });
+    if (!response?.review) throw new Error('Unexpected response from the review endpoint.');
+    syncReviewIntoCache(handbagId, response.review);
+    return response.review;
   } catch (error) {
-    if (error instanceof ReviewError) throw error;
-    if (error?.status === 404) throw new ReviewError('not_found');
-    throw new ReviewError('network');
+    throw toReviewError(error);
   }
 }
 
-/** Xóa đánh giá của chính user. */
+/** Delete only the current customer's review for this product. */
 export async function deleteOwnReview({ userId, handbagId }) {
+  if (!userId || !handbagId) throw new ReviewError('invalid_input', 'Please sign in first.');
   try {
-    const path = handbagPath(handbagId);
-    const record = await api.get(path);
-    const next = asArray(record.feedbacks).filter((item) => !isOwn(item, userId));
-    upsertHandbag(await api.put(path, { ...record, feedbacks: next }));
+    await backendApi.delete(`${productReviewsPath(handbagId)}/mine`);
+    const current = getSnapshot().items.find((item) => String(item.id) === String(handbagId));
+    if (current) {
+      syncProductReviews(handbagId, (current.feedbacks || []).filter((item) => String(item.userId) !== String(userId)));
+    }
   } catch (error) {
-    if (error?.status === 404) throw new ReviewError('not_found');
-    throw new ReviewError('network');
+    throw toReviewError(error);
   }
 }

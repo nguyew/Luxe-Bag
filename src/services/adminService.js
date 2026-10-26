@@ -6,16 +6,13 @@
  *  - Khách hàng: authenticated backend API `/api/admin/customers`.
  *  - Đơn hàng: authenticated backend API `/api/admin/orders`.
  *
- * Mọi thao tác ghi đều ĐỌC bản mới nhất rồi mới ghi lại, để không làm mất dữ
- * liệu khách vừa thay đổi (feedbacks, đơn mới...). Tuy vậy MockAPI không có
- * transaction: nếu khách và admin ghi vào cùng một bản ghi trong cùng một
- * khoảnh khắc, bản ghi sau cùng sẽ thắng.
+ * Product, customer, order, and review administration use the authenticated
+ * Backend API. Backend owns authorization and persistence for all mutations.
  */
-import { api, backendApi, BACKEND_URL } from './api';
+import { backendApi, BACKEND_URL } from './api';
 import { getAuthToken } from './authToken';
 import { removeHandbag, upsertHandbag } from './handbagStore';
 import { OrderError } from './orderService';
-import { feedbackId } from '../utils/feedback';
 import { toPublicUser } from './userService';
 import { nextStatuses } from '../utils/orders';
 
@@ -232,30 +229,26 @@ export async function applyBulkDiscount({ scope, value, percentOff, discountMode
 }
 
 // ---------------------------------------------------------------------------
-// Kiểm duyệt đánh giá
+// Kiểm duyệt đánh giá (Backend)
 // ---------------------------------------------------------------------------
-// Đọc bản mới nhất của túi, sửa mảng feedbacks bằng `mutate`, rồi ghi lại
-async function mutateFeedbacks(handbagId, mutate) {
-  const path = handbagPath(handbagId);
-  const record = await api.get(path);
-  const saved = await api.put(path, { ...record, feedbacks: mutate(asArray(record.feedbacks)) });
-  upsertHandbag(saved);
+export async function setReviewHidden(handbagId, reviewId, hidden) {
+  const response = await backendApi.patch(
+    `api/admin/reviews/${encodeURIComponent(reviewId)}/moderation`,
+    { hidden: !!hidden }
+  );
+  if (!response?.review) throw new Error('Unexpected response from the review moderation endpoint.');
+
+  const current = (await backendApi.get(handbagPath(handbagId))).product;
+  if (current) upsertHandbag(current);
+  return response.review;
 }
 
-/** Ẩn / hiện một đánh giá (đánh giá bị ẩn không hiện cho khách và không tính điểm trung bình). */
-export function setReviewHidden(handbagId, reviewId, hidden) {
-  return mutateFeedbacks(handbagId, (list) =>
-    list.map((item, index) =>
-      feedbackId(item, index) === String(reviewId) ? { ...item, hidden: !!hidden } : item
-    )
-  );
-}
-
-/** Xóa hẳn một đánh giá. */
-export function deleteReview(handbagId, reviewId) {
-  return mutateFeedbacks(handbagId, (list) =>
-    list.filter((item, index) => feedbackId(item, index) !== String(reviewId))
-  );
+/** Permanently delete a review through the authenticated Admin API. */
+export async function deleteReview(handbagId, reviewId) {
+  await backendApi.delete(`api/admin/reviews/${encodeURIComponent(reviewId)}`);
+  const current = (await backendApi.get(handbagPath(handbagId))).product;
+  if (current) upsertHandbag(current);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
