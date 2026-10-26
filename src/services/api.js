@@ -37,6 +37,7 @@ async function request(
     baseUrl,
     auth = false,
     apiName = 'API',
+    signal: externalSignal,
   } = {},
 ) {
   const resolvedBaseUrl = trimBaseUrl(baseUrl);
@@ -57,6 +58,11 @@ async function request(
   const hasBody = body !== undefined;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', onExternalAbort);
+  }
 
   try {
     const headers = {
@@ -116,46 +122,47 @@ async function request(
     throw error;
   } finally {
     clearTimeout(timer);
+    if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
   }
 }
 
 // Legacy MockAPI client. Use only for features that have not been migrated yet.
 export const api = {
-  get: (path) => request(path, {
-    baseUrl: MOCK_API_URL,
+  get: (path, options = {}) => request(path, {
+    ...options, baseUrl: MOCK_API_URL,
     apiName: 'MockAPI',
   }),
-  post: (path, body) => request(path, {
-    method: 'POST', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  post: (path, body, options = {}) => request(path, {
+    ...options, method: 'POST', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
   }),
-  put: (path, body) => request(path, {
-    method: 'PUT', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  put: (path, body, options = {}) => request(path, {
+    ...options, method: 'PUT', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
   }),
-  patch: (path, body) => request(path, {
-    method: 'PATCH', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  patch: (path, body, options = {}) => request(path, {
+    ...options, method: 'PATCH', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
   }),
-  delete: (path) => request(path, {
-    method: 'DELETE', baseUrl: MOCK_API_URL, apiName: 'MockAPI',
+  delete: (path, options = {}) => request(path, {
+    ...options, method: 'DELETE', baseUrl: MOCK_API_URL, apiName: 'MockAPI',
   }),
 };
 
 // Express Backend client. All requests use the Backend URL and include the
 // stored JWT when available. It intentionally never falls back to MockAPI.
 export const backendApi = {
-  get: (path) => request(path, {
-    baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  get: (path, options = {}) => request(path, {
+    ...options, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
   }),
-  post: (path, body) => request(path, {
-    method: 'POST', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  post: (path, body, options = {}) => request(path, {
+    ...options, method: 'POST', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
   }),
-  put: (path, body) => request(path, {
-    method: 'PUT', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  put: (path, body, options = {}) => request(path, {
+    ...options, method: 'PUT', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
   }),
-  patch: (path, body) => request(path, {
-    method: 'PATCH', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  patch: (path, body, options = {}) => request(path, {
+    ...options, method: 'PATCH', body, baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
   }),
-  delete: (path) => request(path, {
-    method: 'DELETE', baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
+  delete: (path, options = {}) => request(path, {
+    ...options, method: 'DELETE', baseUrl: BACKEND_URL, auth: true, apiName: 'Backend',
   }),
 };
 

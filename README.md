@@ -40,7 +40,7 @@ Requires Node.js 18+ and Expo Go (or an emulator).
 2. **Create MockAPI** (free plan, 2 resources): create `handbags` and `users` with the fields specified in [docs/mockapi-schema.md](docs/mockapi-schema.md),
    then import the 14 sample handbags from the assignment into `handbags`.
 
-3. **Configure `.env`**: copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL` (and `EXPO_PUBLIC_GEMINI_API_KEY` if using AI Stylist).
+3. **Configure `.env`**: copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL` (and configure `GEMINI_API_KEY` in `Backend/.env` if using AI Stylist).
    Add `.env` to `.gitignore`.
    When running in Expo Go, do not use `localhost` for the backend URL:
    `localhost` refers to the phone. Use the computer's LAN IPv4 address,
@@ -92,8 +92,8 @@ docs/           mockapi-schema.md, phases/ (notes and checklists for each develo
 - MockAPI **does not provide real authentication**: login, password verification, and role checks run on the app side (passwords are hashed using SHA-256 with a salt). Anyone who knows the API URL can read and write the data.
 - **No transactions**: if two users buy the last item at the same time, or a customer and an admin edit the same account, the last write wins; discount coupon usage may exceed the one-use limit.
 - Payments and refunds are **simulated** (only statuses are recorded; there is no payment gateway). Returns apply to the entire order; partial returns are not supported.
-- `EXPO_PUBLIC_GEMINI_API_KEY` is bundled into the app and therefore cannot be kept secret: set usage limits for the key and do not commit `.env`.
-- AI Stylist uses the Gemini Interactions API (currently in beta). If Google changes the model name, set `EXPO_PUBLIC_GEMINI_MODEL` in `.env`.
+- AI Stylist calls Gemini through the Express Backend so `GEMINI_API_KEY` is not bundled into the Expo app. Keep it only in `Backend/.env` and never commit that file.
+- Configure `GEMINI_MODEL` in `Backend/.env` to override the default model used by AI Stylist.
 
 ## Testing
 

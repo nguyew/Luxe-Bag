@@ -56,4 +56,4 @@ Nếu thiếu thời gian: bỏ 2, 10, 13, 15.
 | Mất mạng | Giải thích đây là chế độ offline; chuyển sang demo phần duyệt / yêu thích |
 | Màn hình trắng | Lắc máy → Reload; nếu vẫn lỗi: `npx expo start -c` |
 | Đơn không hiện bên admin | Kéo xuống để làm mới (dữ liệu admin cache 15 giây) |
-| AI Stylist báo lỗi | Kiểm tra `EXPO_PUBLIC_GEMINI_API_KEY`; bỏ qua mục này và demo phần còn lại |
+| AI Stylist báo lỗi | Kiểm tra `GEMINI_API_KEY` trong `Backend/.env`; bỏ qua mục này và demo phần còn lại |

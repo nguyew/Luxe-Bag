@@ -187,10 +187,9 @@ export default function StylistScreen({ navigation }) {
         <Ionicons name="key-outline" size={34} color="#77716A" />
         <Text style={styles.noticeTitle}>AI Stylist isn’t set up</Text>
         <Text style={styles.noticeText}>
-          Add your Gemini API key to the .env file, then restart Expo with
-          “npx expo start -c”.
+          Configure GEMINI_API_KEY in Backend/.env, then restart the Backend.
         </Text>
-        <Text style={styles.noticeCode}>EXPO_PUBLIC_GEMINI_API_KEY=your_key</Text>
+        <Text style={styles.noticeCode}>GEMINI_API_KEY=your_key</Text>
       </View>
     );
   } else if (catalogState === 'error') {

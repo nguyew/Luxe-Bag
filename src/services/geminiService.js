@@ -1,32 +1,17 @@
 /**
- * geminiService.js – "AI Stylist": nhờ Gemini chọn túi phù hợp trong cửa hàng.
- *
- * Cách hoạt động:
- *  1. Gửi cho Gemini yêu cầu của khách + danh mục túi (rút gọn, lấy từ MockAPI).
- *  2. Ép Gemini trả JSON đúng schema: { reply, picks: [{ id, reason }] }.
- *  3. KIỂM TRA kết quả: chỉ nhận id có thật trong danh mục (không tin AI).
- *
- * Cấu hình trong file .env (sửa xong chạy lại: npx expo start -c):
- *   EXPO_PUBLIC_GEMINI_API_KEY=<API key lấy ở https://aistudio.google.com/apikey>
- *   EXPO_PUBLIC_GEMINI_MODEL=gemini-3.8-flash   (tùy chọn)
- *
- * Gọi bằng fetch tới Interactions API, không cần cài thêm thư viện.
+ * AI Stylist client. Gemini is called by the Express Backend so the API key
+ * stays on the server and is never bundled into the Expo application.
  */
+import { BACKEND_URL, backendApi } from './api';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
 
-// Phải viết đúng dạng process.env.EXPO_PUBLIC_* thì Expo mới thay giá trị vào
-const API_KEY = (process.env.EXPO_PUBLIC_GEMINI_API_KEY || '').trim();
-const MODEL =
-  (process.env.EXPO_PUBLIC_GEMINI_MODEL || '').trim() || 'gemini-3.8-flash';
-
-const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const TIMEOUT_MS = 30000;
 
 export const MAX_PICKS = 3;
 export const MAX_REQUEST_LENGTH = 300;
 const MAX_CATALOG_ITEMS = 60;
 
-export const isGeminiConfigured = API_KEY.length > 0;
+export const isGeminiConfigured = Boolean(BACKEND_URL);
 
 // Schema JSON mà Gemini phải tuân theo
 const RESPONSE_SCHEMA = {
@@ -65,11 +50,11 @@ export class GeminiError extends Error {
 export function describeError(error) {
   switch (error?.code) {
     case 'no_key':
-      return 'The AI Stylist is not set up yet. Add your Gemini API key to .env.';
+      return 'The AI Stylist is not configured on the Backend. Add GEMINI_API_KEY to Backend/.env.';
     case 'auth':
-      return 'Gemini rejected the API key. Check EXPO_PUBLIC_GEMINI_API_KEY.';
+      return 'The Backend could not authenticate with Gemini. Check GEMINI_API_KEY in Backend/.env.';
     case 'bad_request':
-      return 'Gemini could not process this request. Check your API key and model name.';
+      return 'Gemini could not process this request. Check the server model configuration.';
     case 'quota':
       return 'Too many requests right now. Please wait a moment and try again.';
     case 'server':
@@ -77,7 +62,7 @@ export function describeError(error) {
     case 'timeout':
       return 'The stylist took too long to answer. Please try again.';
     case 'network':
-      return 'Could not reach Gemini. Check your internet connection.';
+      return 'Could not reach the AI service. Check your connection and Backend status.';
     case 'invalid':
       return 'The stylist sent an answer I could not read. Please try again.';
     default:
@@ -199,10 +184,10 @@ export function parseStylistResponse(text, handbags) {
  * Lỗi được ném dưới dạng GeminiError (dùng describeError để lấy thông báo).
  */
 export async function askStylist(rawRequest, handbags, { signal } = {}) {
-  if (!API_KEY) throw new GeminiError('no_key');
-
   const request = sanitizeRequest(rawRequest);
   if (!request) throw new GeminiError('bad_request', 'Empty request');
+  if (!Array.isArray(handbags)) throw new GeminiError('bad_request', 'Catalog is invalid');
+  if (!BACKEND_URL) throw new GeminiError('no_key', 'Backend URL is not configured');
 
   const controller = new AbortController();
   let timedOut = false;
@@ -219,46 +204,29 @@ export async function askStylist(rawRequest, handbags, { signal } = {}) {
   try {
     let response;
     try {
-      response = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': API_KEY, // gửi bằng header, không để lộ trong URL
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          input: buildPrompt(request, handbags),
-          response_format: {
-            type: 'text',
-            mime_type: 'application/json',
-            schema: RESPONSE_SCHEMA,
-          },
-        }),
-        signal: controller.signal,
-      });
+      response = await backendApi.post('api/ai/stylist', {
+        request,
+        handbags: handbags.slice(0, MAX_CATALOG_ITEMS).map(toCatalogEntry),
+      }, { signal: controller.signal });
     } catch (error) {
       if (error?.name === 'AbortError') {
         if (timedOut) throw new GeminiError('timeout');
-        throw error; // do người dùng/màn hình hủy
+        throw error;
       }
-      throw new GeminiError('network');
+      if (error?.status === 401 || error?.status === 403) throw new GeminiError('auth');
+      if (error?.status === 429 || error?.data?.code === 'quota') throw new GeminiError('quota');
+      if (error?.data?.code === 'no_key') throw new GeminiError('no_key');
+      if (error?.status === 504 || error?.data?.code === 'timeout') throw new GeminiError('timeout');
+      if (error?.status >= 500) {
+        const code = error?.data?.code;
+        throw new GeminiError(['auth', 'quota', 'server', 'timeout', 'network', 'bad_request', 'invalid'].includes(code) ? code : 'server');
+      }
+      if (error?.message?.includes('Missing EXPO_PUBLIC_BACKEND_URL')) throw new GeminiError('no_key');
+      if (error?.name === 'TypeError' || error?.code === 'network') throw new GeminiError('network');
+      throw new GeminiError('bad_request', error?.message);
     }
 
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) throw new GeminiError('auth');
-      if (response.status === 429) throw new GeminiError('quota');
-      if (response.status >= 500) throw new GeminiError('server');
-      throw new GeminiError('bad_request', `HTTP ${response.status}`);
-    }
-
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      throw new GeminiError('invalid');
-    }
-
-    return parseStylistResponse(extractText(data), handbags);
+    return parseStylistResponse(response?.outputText, handbags);
   } finally {
     clearTimeout(timer);
     if (signal) signal.removeEventListener('abort', onAbort);
