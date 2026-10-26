@@ -1,72 +1,71 @@
 /**
- * promotionService – mã giảm giá.
- *
- * Gói MockAPI miễn phí chỉ có 2 resource (handbags, users), nên mã giảm giá được
- * lưu trong MỘT bản ghi nội bộ của resource `users`:
- *   { email: 'promotions@luxebag.system', role: 'system', promotions: [...] }
- * Bản ghi này không có mật khẩu nên không thể đăng nhập, và bị loại khỏi danh
- * sách khách hàng (role 'system'). Bản ghi được tạo tự động lần đầu admin lưu mã.
- * Nếu sau này có resource riêng, chỉ cần sửa file này.
- *
- * Resource `users` cần có thêm field `promotions` (kiểu Array).
+ * Coupon service backed by the LuxeBag Backend (MongoDB).
+ * Public checkout reads active coupons from GET /api/coupons.
+ * Admin screens use the protected /api/admin/coupons endpoints.
  */
-import { api } from './api';
+import { backendApi } from './api';
 import { sanitizeCoupons } from '../utils/coupons';
 
-export const SYSTEM_EMAIL = 'promotions@luxebag.system';
+const ADMIN_PATH = 'api/admin/coupons';
+const PUBLIC_PATH = 'api/coupons';
 
-async function findRecord() {
-  try {
-    const list = await api.get(`users?email=${encodeURIComponent(SYSTEM_EMAIL)}`);
-    if (!Array.isArray(list)) return null;
-    return list.find((item) => String(item.email).toLowerCase() === SYSTEM_EMAIL) || null;
-  } catch (error) {
-    if (error?.status === 404) return null; // MockAPI trả 404 khi lọc không có kết quả
-    throw error;
+/** Return coupons available for checkout. Server filters inactive/expired/used-up codes. */
+export async function fetchPromotions() {
+  const response = await backendApi.get(PUBLIC_PATH);
+  if (!Array.isArray(response?.coupons)) {
+    throw new Error('Unexpected response from the coupons endpoint.');
   }
+  return sanitizeCoupons(response.coupons);
 }
 
-/** Tất cả mã giảm giá hiện có. */
-export async function fetchPromotions() {
-  const record = await findRecord();
-  return sanitizeCoupons(record?.promotions);
+/** Return every coupon, including inactive/expired coupons, for Admin screens. */
+export async function fetchAdminPromotions() {
+  const response = await backendApi.get(ADMIN_PATH);
+  if (!Array.isArray(response?.coupons)) {
+    throw new Error('Unexpected response from the admin coupons endpoint.');
+  }
+  return sanitizeCoupons(response.coupons);
 }
 
 /**
- * Sửa danh sách mã: đọc bản MỚI NHẤT, áp dụng `mutate(list) -> list mới`, rồi ghi lại.
- * (Đọc lại để không làm mất lượt dùng `usedCount` mà khách vừa tạo ra.)
+ * Retains the existing UI contract: updateCoupons(list => nextList).
+ * Changes are reconciled against the Backend using protected CRUD endpoints.
  */
 export async function updateCoupons(mutate) {
-  const record = await findRecord();
-  const next = sanitizeCoupons(mutate(sanitizeCoupons(record?.promotions)));
-
-  if (record) {
-    await api.put(`users/${encodeURIComponent(record.id)}`, { ...record, promotions: next });
-  } else {
-    await api.post('users', {
-      name: 'Promotions',
-      email: SYSTEM_EMAIL,
-      role: 'system',
-      status: 'active',
-      phone: '',
-      createdAt: new Date().toISOString(),
-      addresses: [],
-      orders: [],
-      promotions: next,
-    });
+  if (typeof mutate !== 'function') {
+    throw new TypeError('updateCoupons expects a function.');
   }
-  return next;
+
+  const current = await fetchAdminPromotions();
+  const next = sanitizeCoupons(mutate(current));
+  const currentById = new Map(current.map((coupon) => [coupon.id, coupon]));
+  const nextById = new Map(next.map((coupon) => [coupon.id, coupon]));
+
+  // Delete removed coupons first. Historical orders keep their stored couponCode/discount.
+  for (const coupon of current) {
+    if (!nextById.has(coupon.id)) {
+      await backendApi.delete(`${ADMIN_PATH}/${encodeURIComponent(coupon.id)}`);
+    }
+  }
+
+  // Create new coupons or patch changed coupons.
+  for (const coupon of next) {
+    const previous = currentById.get(coupon.id);
+    if (!previous) {
+      await backendApi.post(ADMIN_PATH, coupon);
+    } else if (JSON.stringify(previous) !== JSON.stringify(coupon)) {
+      await backendApi.patch(`${ADMIN_PATH}/${encodeURIComponent(coupon.id)}`, coupon);
+    }
+  }
+
+  // Read server state back so the UI uses canonical data.
+  return fetchAdminPromotions();
 }
 
-/** Ghi nhận một lượt dùng mã. Không bao giờ ném lỗi: đơn hàng đã đặt thành công rồi. */
-export async function redeemCoupon(couponId) {
-  try {
-    await updateCoupons((list) =>
-      list.map((item) =>
-        item.id === couponId ? { ...item, usedCount: item.usedCount + 1 } : item
-      )
-    );
-  } catch {
-    // bỏ qua
-  }
+/**
+ * Kept for backwards compatibility. Redemption is now counted atomically by
+ * the Backend during POST /api/orders; clients must not increment usage separately.
+ */
+export async function redeemCoupon(_couponId) {
+  return undefined;
 }

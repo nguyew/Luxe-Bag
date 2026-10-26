@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AuthField from '../components/AuthField';
-import { fetchPromotions, updateCoupons } from '../services/promotionService';
+import { fetchAdminPromotions, updateCoupons } from '../services/promotionService';
 import { normalizeCode } from '../utils/coupons';
 import { formatOrderDate } from '../utils/orders';
 
@@ -65,7 +65,7 @@ export default function AdminCouponFormScreen({ navigation, route }) {
   // Nạp danh sách mã (để sửa, và để kiểm tra trùng mã)
   useEffect(() => {
     let cancelled = false;
-    fetchPromotions()
+    fetchAdminPromotions()
       .then((list) => {
         if (cancelled) return;
         setAllCodes(list);

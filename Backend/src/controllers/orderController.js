@@ -1,11 +1,13 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const Coupon = require('../models/Coupon');
 
 const SHIPPING_FEE = 15;
 const FREE_SHIPPING_THRESHOLD = 500;
 const MAX_PER_LINE = 10;
 const RETURN_WINDOW_DAYS = 7;
+const normalizeCouponCode = (value) => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
 const RETURN_REASONS = [
   'Damaged or defective',
   'Wrong item received',
@@ -43,11 +45,7 @@ const createOrder = async (req, res) => {
     return badRequest(res, 'A complete delivery address is required.', { code: 'no_address' });
   }
   if (!['cod', 'card'].includes(paymentMethod)) return badRequest(res, 'Invalid payment method.', { code: 'invalid_input' });
-  // Coupon validation is intentionally rejected until coupons are managed by the Backend.
-  // This avoids trusting a discount calculated only in the mobile app.
-  if (typeof couponCode === 'string' && couponCode.trim()) {
-    return res.status(501).json({ error: 'Coupon checkout is not available until coupon management is migrated to the Backend.', code: 'invalid_coupon' });
-  }
+  const normalizedCouponCode = normalizeCouponCode(couponCode);
 
   const quantities = new Map();
   for (const item of requestedItems) {
@@ -65,6 +63,7 @@ const createOrder = async (req, res) => {
   const reserved = [];
   const orderItems = [];
   const problems = [];
+  let redeemedCoupon = null;
   try {
     for (const [productId, qty] of quantities.entries()) {
       // Atomically reserve stock so concurrent orders cannot oversell a product.
@@ -101,6 +100,33 @@ const createOrder = async (req, res) => {
     }
 
     const subtotal = round2(orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0));
+    let discount = 0;
+    if (normalizedCouponCode) {
+      const nowForCoupon = new Date();
+      // Increment usedCount atomically only when the coupon is still valid and has capacity.
+      redeemedCoupon = await Coupon.findOneAndUpdate(
+        {
+          code: normalizedCouponCode,
+          active: true,
+          minSubtotal: { $lte: subtotal },
+          $and: [
+            { $or: [{ expiresAt: null }, { expiresAt: { $gt: nowForCoupon } }] },
+            { $or: [{ usageLimit: null }, { $expr: { $lt: ['$usedCount', '$usageLimit'] } }] },
+          ],
+        },
+        { $inc: { usedCount: 1 } },
+        { new: true }
+      );
+      if (!redeemedCoupon) {
+        await Promise.all(reserved.map(({ productId, qty }) => Product.updateOne({ _id: productId }, { $inc: { stock: qty } })));
+        reserved.length = 0;
+        return res.status(400).json({ error: 'This discount code is invalid, expired, inactive, or no longer available.', code: 'invalid_coupon' });
+      }
+      const rawDiscount = redeemedCoupon.type === 'percent'
+        ? (subtotal * redeemedCoupon.value) / 100
+        : redeemedCoupon.value;
+      discount = round2(Math.min(Math.max(rawDiscount, 0), subtotal));
+    }
     const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
     const now = new Date();
     const order = await Order.create({
@@ -108,16 +134,16 @@ const createOrder = async (req, res) => {
       status: 'pending',
       items: orderItems,
       subtotal,
-      discount: 0,
+      discount,
       shipping,
-      total: round2(subtotal + shipping),
+      total: round2(subtotal - discount + shipping),
       address: {
         fullName: address.fullName.trim(),
         phone: address.phone.trim(),
         line1: address.line1.trim(),
         city: address.city.trim(),
       },
-      couponCode: null,
+      couponCode: redeemedCoupon ? redeemedCoupon.code : null,
       paymentMethod,
       // 
       // Card payment is a demo payment method; no real charge is made.
@@ -127,6 +153,9 @@ const createOrder = async (req, res) => {
     return res.status(201).json({ order: serializeOrder(order) });
   } catch (error) {
     await Promise.allSettled(reserved.map(({ productId, qty }) => Product.updateOne({ _id: productId }, { $inc: { stock: qty } })));
+    if (redeemedCoupon) {
+      await Coupon.updateOne({ _id: redeemedCoupon._id, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } }).catch(() => {});
+    }
     throw error;
   }
 };

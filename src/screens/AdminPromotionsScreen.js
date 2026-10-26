@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchPromotions, updateCoupons } from '../services/promotionService';
+import { fetchAdminPromotions, updateCoupons } from '../services/promotionService';
 import { couponStatus, describeCoupon } from '../utils/coupons';
 import { formatOrderDate } from '../utils/orders';
 
@@ -32,7 +32,7 @@ export default function AdminPromotionsScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      setCoupons(await fetchPromotions());
+      setCoupons(await fetchAdminPromotions());
       setError('');
     } catch {
       setError('Could not load discount codes.');
