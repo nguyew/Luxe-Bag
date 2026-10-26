@@ -6,6 +6,7 @@ const publicUser = (user) => ({
   status: user.status,
   phone: user.phone,
   avatarUrl: user.avatarUrl,
+  addresses: Array.isArray(user.addresses) ? user.addresses : [],
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });

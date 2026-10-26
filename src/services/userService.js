@@ -4,7 +4,7 @@
  * Authentication uses the backend's /api/auth endpoints. Other account
  * operations continue to use the configured resource API.
  */
-import { api, backendApi } from './api';
+import { backendApi } from './api';
 import {
   validateEmail,
   validateName,
@@ -13,7 +13,6 @@ import {
   validateRequired,
 } from '../utils/validation';
 
-const ENDPOINT = 'users';
 const AUTH_ENDPOINT = 'api/auth';
 
 export class AuthError extends Error {
@@ -55,12 +54,22 @@ export function toPublicUser(record) {
     phone: String(record.phone || ''),
     createdAt: record.createdAt || null,
     addresses: Array.isArray(record.addresses) ? record.addresses : [],
+    avatarUrl: String(record.avatarUrl || ''),
   };
 }
 
 // Mọi lỗi không phải AuthError (mất mạng, quá hạn, 5xx...) đều quy về 'network'
 function asAuthError(error) {
-  return error instanceof AuthError ? error : new AuthError('network');
+  if (error instanceof AuthError) return error;
+  if (error?.status === 400) {
+    const details = error?.data?.details;
+    const message = Array.isArray(details) ? details.join(' ') : (error?.data?.error || error?.message);
+    return new AuthError('invalid_input', message);
+  }
+  if (error?.status === 401) return new AuthError('invalid_credentials');
+  if (error?.status === 403) return new AuthError('disabled');
+  if (error?.status === 409) return new AuthError('email_taken');
+  return new AuthError('network', error?.message);
 }
 
 /** Đăng ký tài khoản khách hàng mới. Trả về user công khai. */
@@ -109,23 +118,34 @@ export async function getUserById() {
   return toPublicUser(response.user);
 }
 
-// Các trường người dùng được phép tự sửa
+// Các trường người dùng được phép tự sửa; backend chỉ nhận các trường này.
 const EDITABLE_FIELDS = ['name', 'phone'];
 
-/** Cập nhật hồ sơ. Đọc bản mới nhất rồi ghi lại để không làm mất orders/addresses. */
-export async function updateUser(id, patch) {
+/** Cập nhật hồ sơ bằng endpoint đã xác thực; không còn đọc/ghi MockAPI. */
+export async function updateUser(_id, patch = {}) {
   const safePatch = {};
   EDITABLE_FIELDS.forEach((field) => {
     if (patch[field] !== undefined) safePatch[field] = String(patch[field]).trim();
   });
+
   if (safePatch.name !== undefined) {
     const invalid = validateName(safePatch.name);
     if (invalid) throw new AuthError('invalid_input', invalid);
   }
+  if (safePatch.phone !== undefined && safePatch.phone !== '' && validatePhone(safePatch.phone)) {
+    throw new AuthError('invalid_input', validatePhone(safePatch.phone));
+  }
+  if (Object.keys(safePatch).length === 0) {
+    throw new AuthError('invalid_input', 'No valid profile fields were provided.');
+  }
 
-  const path = `${ENDPOINT}/${encodeURIComponent(id)}`;
-  const record = await api.get(path);
-  return toPublicUser(await api.put(path, { ...record, ...safePatch }));
+  try {
+    const response = await backendApi.patch(`${AUTH_ENDPOINT}/me`, safePatch);
+    if (!response?.user) throw new Error('Unexpected response from the server.');
+    return toPublicUser(response.user);
+  } catch (error) {
+    throw asAuthError(error);
+  }
 }
 
 export const MAX_ADDRESSES = 10;
@@ -165,10 +185,15 @@ export function sanitizeAddresses(list) {
   return cleaned;
 }
 
-/** Ghi lại toàn bộ địa chỉ của user (đọc bản mới nhất trước để không mất orders). */
-export async function setUserAddresses(id, addresses) {
-  const path = `${ENDPOINT}/${encodeURIComponent(id)}`;
-  const record = await api.get(path);
-  const saved = await api.put(path, { ...record, addresses: sanitizeAddresses(addresses) });
-  return toPublicUser(saved);
+/** Lưu địa chỉ giao hàng vào hồ sơ trên Backend. */
+export async function setUserAddresses(_id, addresses) {
+  try {
+    const response = await backendApi.patch(`${AUTH_ENDPOINT}/me`, {
+      addresses: sanitizeAddresses(addresses),
+    });
+    if (!response?.user) throw new Error('Unexpected response from the server.');
+    return toPublicUser(response.user);
+  } catch (error) {
+    throw asAuthError(error);
+  }
 }

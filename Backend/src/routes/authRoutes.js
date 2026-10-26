@@ -1,7 +1,7 @@
 const express = require('express');
 const asyncHandler = require('../middleware/asyncHandler');
 const authenticate = require('../middleware/authenticate');
-const { getCurrentUser, login, register } = require('../controllers/authController');
+const { getCurrentUser, updateCurrentUser, login, register } = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -61,6 +61,8 @@ router.post('/login', asyncHandler(login));
  *       401:
  *         description: Missing or invalid JWT
  */
-router.get('/me', authenticate, getCurrentUser);
+router.route('/me')
+  .get(authenticate, getCurrentUser)
+  .patch(authenticate, asyncHandler(updateCurrentUser));
 
 module.exports = router;

@@ -69,8 +69,71 @@ const login = async (req, res) => {
 
 const getCurrentUser = (req, res) => res.json({ user: publicUser(req.user) });
 
+const updateCurrentUser = async (req, res) => {
+  const { name, phone, addresses } = req.body || {};
+  const updates = {};
+
+  if (name !== undefined) {
+    if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) {
+      return res.status(400).json({ error: 'Name must be between 2 and 100 characters.', code: 'invalid_input' });
+    }
+    updates.name = name.trim();
+  }
+
+  if (phone !== undefined) {
+    if (typeof phone !== 'string') {
+      return res.status(400).json({ error: 'Phone must be a string.', code: 'invalid_input' });
+    }
+    updates.phone = phone.trim();
+  }
+
+  if (addresses !== undefined) {
+    if (!Array.isArray(addresses) || addresses.length > 10) {
+      return res.status(400).json({ error: 'Addresses must be an array containing at most 10 entries.', code: 'invalid_input' });
+    }
+    const validAddresses = addresses.every((address) =>
+      address && typeof address === 'object' &&
+      typeof address.id === 'string' && address.id.trim() &&
+      typeof address.fullName === 'string' && address.fullName.trim() &&
+      typeof address.phone === 'string' && address.phone.trim() &&
+      typeof address.line1 === 'string' && address.line1.trim() &&
+      typeof address.city === 'string' && address.city.trim()
+    );
+    if (!validAddresses) {
+      return res.status(400).json({ error: 'Each address must include id, fullName, phone, line1, and city.', code: 'invalid_input' });
+    }
+    const normalized = addresses.map((address) => ({
+      id: address.id.trim(),
+      label: String(address.label || 'Home').trim().slice(0, 20) || 'Home',
+      fullName: address.fullName.trim(),
+      phone: address.phone.trim(),
+      line1: address.line1.trim(),
+      city: address.city.trim(),
+      isDefault: address.isDefault === true,
+    }));
+    if (normalized.length) {
+      const defaultIndex = normalized.findIndex((address) => address.isDefault);
+      const keepDefault = defaultIndex >= 0 ? defaultIndex : 0;
+      normalized.forEach((address, index) => { address.isDefault = index === keepDefault; });
+    }
+    updates.addresses = normalized;
+  }
+
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ error: 'At least one editable field is required.', code: 'invalid_input' });
+  }
+
+  const user = await User.findByIdAndUpdate(req.user._id, { $set: updates }, {
+    new: true,
+    runValidators: true,
+  });
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+  return res.json({ user: publicUser(user) });
+};
+
 module.exports = {
   getCurrentUser,
+  updateCurrentUser,
   login,
   register,
 };
