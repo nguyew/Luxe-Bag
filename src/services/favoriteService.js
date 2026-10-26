@@ -1,131 +1,238 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { backendApi } from './api';
 
 /**
- * favoriteService – lưu danh sách túi yêu thích trên thiết bị bằng AsyncStorage.
- *
- * - Lưu nguyên object handbag, nên màn Favorites hiển thị được ngay,
- *   không cần gọi lại API.
- * - Không lưu trùng: so sánh theo id (luôn đổi về chuỗi).
- * - Ghi tuần tự (queue) để bấm nhanh nhiều lần không bị ghi đè dữ liệu.
- * - Mỗi lần thay đổi sẽ báo cho các màn đang lắng nghe (subscribeFavorites),
- *   nên xóa ở màn này thì màn kia cập nhật ngay.
+ * Favorites service.
+ * - Guests: AsyncStorage on this device.
+ * - Signed-in users: Backend/MongoDB, with AsyncStorage as an offline cache.
+ * - Existing exports are preserved for current screens/hooks.
  */
-
-// Khách (chưa đăng nhập) dùng khóa gốc (giữ nguyên dữ liệu cũ trên máy);
-// mỗi tài khoản có danh sách riêng: '@luxebag/favorites:<userId>'
 const GUEST_KEY = '@luxebag/favorites';
+const CACHE_PREFIX = `${GUEST_KEY}:`;
+const ENDPOINT = 'api/favorites';
+const POLL_MS = 15000;
+
+let ownerId = null;
 let storageKey = GUEST_KEY;
-
+let ownerGeneration = 0;
+let pollTimer = null;
+let remoteQueue = Promise.resolve();
+let syncStatus = 'idle';
+let currentList = [];
 const listeners = new Set();
-let queue = Promise.resolve();
+let writeQueue = Promise.resolve();
 
-// Chạy các thao tác ghi lần lượt, lỗi của việc trước không chặn việc sau
-function enqueue(task) {
-  const result = queue.then(task);
-  queue = result.catch(() => {});
+const normalizeId = (item) => {
+  const id = item?.id ?? item?._id ?? item?.productId;
+  return id === undefined || id === null ? '' : String(id);
+};
+
+function sanitizeList(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const item of raw) {
+    const id = normalizeId(item);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push({ ...item, id });
+  }
   return result;
 }
 
 function notify(list) {
   listeners.forEach((listener) => {
-    try {
-      listener(list);
-    } catch {
-      // một listener lỗi không được làm hỏng các listener khác
-    }
+    try { listener(list); } catch { /* isolate listener errors */ }
   });
 }
 
-async function readList() {
+function enqueueWrite(task) {
+  const result = writeQueue.then(task);
+  writeQueue = result.catch(() => {});
+  return result;
+}
+
+async function readCache(key = storageKey) {
   try {
-    const raw = await AsyncStorage.getItem(storageKey);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? sanitizeList(JSON.parse(raw)) : [];
   } catch {
-    // dữ liệu hỏng -> coi như danh sách rỗng
     return [];
   }
 }
 
-async function writeList(list) {
-  await AsyncStorage.setItem(storageKey, JSON.stringify(list));
-  notify(list);
-  return list;
+async function saveCache(list, key = storageKey) {
+  await AsyncStorage.setItem(key, JSON.stringify(list));
 }
 
-/**
- * Đổi chủ sở hữu danh sách (gọi khi đăng nhập / đăng xuất).
- * ownerId = null -> danh sách của khách. Các màn đang lắng nghe tự cập nhật.
- */
-export function setFavoritesOwner(ownerId) {
-  return enqueue(async () => {
-    storageKey = ownerId ? `${GUEST_KEY}:${String(ownerId)}` : GUEST_KEY;
-    notify(await readList());
-  });
+function publish(list) {
+  currentList = sanitizeList(list);
+  notify(currentList);
+  return currentList;
 }
 
-/** Lấy toàn bộ danh sách yêu thích (mới thêm nằm trước). */
-export function getFavorites() {
-  return readList();
-}
-
-/** Túi này đã được yêu thích chưa. */
-export async function isFavorite(id) {
-  const list = await readList();
-  return list.some((item) => String(item.id) === String(id));
-}
-
-/** Thêm một túi. Nếu id đã có thì giữ nguyên danh sách. Trả về danh sách mới. */
-export function addFavorite(handbag) {
-  return enqueue(async () => {
-    const list = await readList();
-    if (list.some((item) => String(item.id) === String(handbag.id))) {
-      return list;
+function queueRemoteSave(list, generation = ownerGeneration, key = storageKey) {
+  if (!ownerId) return Promise.resolve(list);
+  const snapshot = sanitizeList(list);
+  const ownerAtQueue = ownerId;
+  remoteQueue = remoteQueue.catch(() => {}).then(async () => {
+    if (!ownerAtQueue || generation !== ownerGeneration || key !== storageKey) return;
+    syncStatus = 'syncing';
+    try {
+      await backendApi.put(ENDPOINT, { favorites: snapshot });
+      if (generation === ownerGeneration && key === storageKey) syncStatus = 'synced';
+    } catch (error) {
+      if (generation === ownerGeneration && key === storageKey) syncStatus = 'error';
+      throw error;
     }
-    return writeList([handbag, ...list]);
+  });
+  return remoteQueue.then(() => snapshot);
+}
+
+async function refreshRemote(generation = ownerGeneration, key = storageKey) {
+  if (!ownerId || generation !== ownerGeneration || key !== storageKey) return;
+  // Avoid replacing a local change while it is being sent to the server.
+  if (syncStatus === 'syncing') return;
+  // If a previous write failed, retry the local snapshot before reading remote
+  // data so an offline change cannot be silently discarded by the next poll.
+  if (syncStatus === 'error') {
+    try {
+      await queueRemoteSave(currentList, generation, key);
+      return;
+    } catch {
+      return;
+    }
+  }
+  try {
+    const response = await backendApi.get(ENDPOINT);
+    if (generation !== ownerGeneration || key !== storageKey) return;
+    if (!Array.isArray(response?.favorites)) {
+      throw new Error('Unexpected favorites response from the server.');
+    }
+    const remoteList = sanitizeList(response.favorites);
+    const cachedList = await readCache(key);
+    // Migrate this account's pre-Backend local favorites once, but respect an
+    // existing empty server list (which can mean the user cleared favorites).
+    if (response.hasRecord === false && cachedList.length > 0) {
+      await backendApi.put(ENDPOINT, { favorites: cachedList });
+      if (generation !== ownerGeneration || key !== storageKey) return;
+      publish(cachedList);
+      syncStatus = 'synced';
+      return;
+    }
+    const same = JSON.stringify(remoteList) === JSON.stringify(cachedList);
+    if (!same) await saveCache(remoteList, key);
+    publish(remoteList);
+    syncStatus = 'synced';
+  } catch {
+    if (generation === ownerGeneration && key === storageKey) syncStatus = 'error';
+  }
+}
+
+/** Switch favorites owner on login/logout. null means guest mode. */
+export function setFavoritesOwner(nextOwnerId) {
+  return enqueueWrite(async () => {
+    ownerGeneration += 1;
+    const generation = ownerGeneration;
+    ownerId = nextOwnerId ? String(nextOwnerId) : null;
+    storageKey = ownerId ? `${CACHE_PREFIX}${ownerId}` : GUEST_KEY;
+    syncStatus = 'idle';
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+
+    const cached = await readCache(storageKey);
+    publish(cached);
+
+    if (ownerId) {
+      // Backend is authoritative for signed-in accounts. If it is temporarily
+      // unavailable, keep showing the local cache and retry on the polling loop.
+      await refreshRemote(generation, storageKey);
+      pollTimer = setInterval(() => {
+        refreshRemote(generation, storageKey);
+      }, POLL_MS);
+    }
+    return currentList;
   });
 }
 
-/** Xóa một túi theo id. Trả về danh sách mới. */
+export async function getFavorites() {
+  return sanitizeList(currentList.length || ownerId ? currentList : await readCache());
+}
+
+export async function isFavorite(id) {
+  const list = await getFavorites();
+  return list.some((item) => normalizeId(item) === String(id));
+}
+
+export function addFavorite(handbag) {
+  return enqueueWrite(async () => {
+    const id = normalizeId(handbag);
+    if (!id) return currentList;
+    const list = await getFavorites();
+    if (list.some((item) => normalizeId(item) === id)) return list;
+    const next = publish([{ ...handbag, id }, ...list]);
+    const key = storageKey;
+    const generation = ownerGeneration;
+    await saveCache(next, key);
+    await queueRemoteSave(next, generation, key).catch(() => {});
+    return next;
+  });
+}
+
 export function removeFavorite(id) {
-  return enqueue(async () => {
-    const list = await readList();
-    const next = list.filter((item) => String(item.id) !== String(id));
+  return enqueueWrite(async () => {
+    const list = await getFavorites();
+    const next = list.filter((item) => normalizeId(item) !== String(id));
     if (next.length === list.length) return list;
-    return writeList(next);
+    publish(next);
+    const key = storageKey;
+    const generation = ownerGeneration;
+    await saveCache(next, key);
+    await queueRemoteSave(next, generation, key).catch(() => {});
+    return next;
   });
 }
 
-/** Xóa tất cả. Trả về danh sách rỗng. */
 export function clearFavorites() {
-  return enqueue(async () => {
-    await AsyncStorage.removeItem(storageKey);
-    notify([]);
-    return [];
+  return enqueueWrite(async () => {
+    const next = publish([]);
+    const key = storageKey;
+    const generation = ownerGeneration;
+    await saveCache(next, key);
+    await queueRemoteSave(next, generation, key).catch(() => {});
+    return next;
   });
 }
 
-/**
- * Bật/tắt yêu thích cho một túi (dùng cho nút trái tim).
- * Trả về { favorites, added } – added = true nếu vừa thêm, false nếu vừa xóa.
- */
 export function toggleFavorite(handbag) {
-  return enqueue(async () => {
-    const list = await readList();
-    const exists = list.some(
-      (item) => String(item.id) === String(handbag.id)
-    );
+  return enqueueWrite(async () => {
+    const id = normalizeId(handbag);
+    if (!id) return { favorites: await getFavorites(), added: false };
+    const list = await getFavorites();
+    const exists = list.some((item) => normalizeId(item) === id);
     const next = exists
-      ? list.filter((item) => String(item.id) !== String(handbag.id))
-      : [handbag, ...list];
-    await writeList(next);
+      ? list.filter((item) => normalizeId(item) !== id)
+      : [{ ...handbag, id }, ...list];
+    publish(next);
+    const key = storageKey;
+    const generation = ownerGeneration;
+    await saveCache(next, key);
+    await queueRemoteSave(next, generation, key).catch(() => {});
     return { favorites: next, added: !exists };
   });
 }
 
-/** Lắng nghe thay đổi. Trả về hàm hủy đăng ký. */
 export function subscribeFavorites(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/** Optional helper for debugging or showing a sync indicator in the UI. */
+export function getFavoritesSyncStatus() {
+  return syncStatus;
+}
+
+export async function waitForFavoritesSync() {
+  await remoteQueue.catch(() => {});
+  return syncStatus;
 }
