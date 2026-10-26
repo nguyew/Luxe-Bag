@@ -34,6 +34,9 @@ const orderSchema = new mongoose.Schema({
     reason: String,
     note: { type: String, maxlength: 300 },
     requestedAt: Date,
+    resolvedAt: Date,
+    adminNote: { type: String, maxlength: 300, default: '' },
+    restocked: { type: Boolean, default: false },
   },
 }, { timestamps: true });
 

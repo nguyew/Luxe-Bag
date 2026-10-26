@@ -21,9 +21,16 @@ const {
   uploadImageProxy,
 } = require('../controllers/productController');
 
+const { listAdminOrders, updateAdminOrderStatus, resolveAdminReturn } = require('../controllers/adminOrderController');
+
 const router = express.Router();
 
 router.use(authenticate, requireAdmin);
+
+// Admin order management (orders are stored in the Order collection, not User documents).
+router.get('/orders', asyncHandler(listAdminOrders));
+router.patch('/orders/:id/status', asyncHandler(updateAdminOrderStatus));
+router.patch('/orders/:id/return-request', asyncHandler(resolveAdminReturn));
 
 /**
  * @swagger

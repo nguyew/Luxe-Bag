@@ -1,0 +1,97 @@
+const mongoose = require('mongoose');
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+
+const NEXT_STATUSES = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['shipping', 'cancelled'],
+  shipping: ['delivered'],
+  delivered: [],
+  cancelled: [],
+  returned: [],
+};
+
+const asId = (value) => value?._id ? value._id.toString() : String(value || '');
+const serializeOrder = (order) => {
+  const raw = order.toObject ? order.toObject() : order;
+  return {
+    ...raw,
+    id: asId(raw._id),
+    userId: asId(raw.userId),
+    items: (raw.items || []).map((item) => ({ ...item.toObject?.() || item, handbagId: item.handbagId || asId(item.productId) })),
+    history: (raw.history || []).map((entry) => ({ ...entry.toObject?.() || entry, at: entry.at instanceof Date ? entry.at.toISOString() : entry.at })),
+    createdAt: raw.createdAt instanceof Date ? raw.createdAt.toISOString() : raw.createdAt,
+    updatedAt: raw.updatedAt instanceof Date ? raw.updatedAt.toISOString() : raw.updatedAt,
+    cancelledAt: raw.cancelledAt instanceof Date ? raw.cancelledAt.toISOString() : raw.cancelledAt,
+    returnRequest: raw.returnRequest ? {
+      ...raw.returnRequest,
+      requestedAt: raw.returnRequest.requestedAt instanceof Date ? raw.returnRequest.requestedAt.toISOString() : raw.returnRequest.requestedAt,
+      resolvedAt: raw.returnRequest.resolvedAt instanceof Date ? raw.returnRequest.resolvedAt.toISOString() : raw.returnRequest.resolvedAt,
+    } : null,
+  };
+};
+
+const listAdminOrders = async (req, res) => {
+  const page = Math.max(Number.parseInt(req.query.page || '1', 10), 1);
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '100', 10), 1), 500);
+  const filter = {};
+  if (typeof req.query.status === 'string' && req.query.status) filter.status = req.query.status;
+  const [orders, total] = await Promise.all([
+    Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+    Order.countDocuments(filter),
+  ]);
+  return res.json({ orders: orders.map(serializeOrder), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+};
+
+const updateAdminOrderStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body || {};
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'Invalid order id.', code: 'invalid_input' });
+  const order = await Order.findById(id);
+  if (!order) return res.status(404).json({ error: 'Order not found.', code: 'not_found' });
+  if (!Object.prototype.hasOwnProperty.call(NEXT_STATUSES, status) || !NEXT_STATUSES[order.status].includes(status)) {
+    return res.status(409).json({ error: 'Invalid order status transition.', code: 'invalid_transition' });
+  }
+
+  const now = new Date();
+  if (status === 'cancelled') {
+    // Only return stock after the status transition has been accepted.
+    await Promise.all(order.items.map((item) => Product.updateOne({ _id: item.productId }, { $inc: { stock: item.qty } })));
+    order.cancelledAt = now;
+    if (order.paymentStatus === 'paid') order.paymentStatus = 'refunded';
+  }
+  if (status === 'delivered' && order.paymentMethod === 'cod') order.paymentStatus = 'paid';
+  order.status = status;
+  order.history.push({ status, at: now });
+  await order.save();
+  return res.json({ order: serializeOrder(order) });
+};
+
+const resolveAdminReturn = async (req, res) => {
+  const { id } = req.params;
+  const { decision, restock = false, note = '' } = req.body || {};
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'Invalid order id.', code: 'invalid_input' });
+  if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'Decision must be approve or reject.', code: 'invalid_return' });
+  const order = await Order.findById(id);
+  if (!order) return res.status(404).json({ error: 'Order not found.', code: 'not_found' });
+  if (order.returnRequest?.status !== 'requested') return res.status(409).json({ error: 'This order has no pending return request.', code: 'invalid_return' });
+
+  const now = new Date();
+  const approved = decision === 'approve';
+  order.returnRequest.status = approved ? 'approved' : 'rejected';
+  order.returnRequest.resolvedAt = now;
+  order.returnRequest.adminNote = String(note || '').trim().slice(0, 300);
+  order.returnRequest.restocked = approved && restock === true;
+  if (approved) {
+    order.status = 'returned';
+    if (order.paymentStatus === 'paid') order.paymentStatus = 'refunded';
+    order.history.push({ status: 'returned', at: now });
+    if (restock === true) {
+      await Promise.all(order.items.map((item) => Product.updateOne({ _id: item.productId }, { $inc: { stock: item.qty } })));
+    }
+  }
+  await order.save();
+  return res.json({ order: serializeOrder(order) });
+};
+
+module.exports = { listAdminOrders, updateAdminOrderStatus, resolveAdminReturn };
