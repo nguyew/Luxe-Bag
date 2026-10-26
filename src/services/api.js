@@ -1,16 +1,3 @@
-/**
- * api.js – gọi MockAPI (mockapi.io).
- *
- * Địa chỉ gốc đọc từ file .env ở thư mục gốc của project:
- *   EXPO_PUBLIC_API_URL=https://abc123.mockapi.io
- * (nếu lỡ dán thêm "/handbags" ở cuối thì code tự bỏ đi).
- * Sửa .env xong phải khởi động lại: npx expo start -c
- *
- * Dùng chung cho mọi resource (handbags, users...):
- *   api.get('users'), api.post('users', body), api.put('users/5', body), api.delete('users/5')
- * Lỗi HTTP được ném ra kèm `error.status` (ví dụ 404) để nơi gọi xử lý riêng.
- * Lưu ý: MockAPI trả 404 khi lọc (?email=...) mà không có kết quả nào.
- */
 export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || '')
   .trim()
   .replace(/\/+$/, '') // bỏ dấu "/" ở cuối
@@ -74,11 +61,46 @@ export const api = {
   delete: (path) => request(path, { method: 'DELETE' }),
 };
 
+const BACKEND_URL = (
+  process.env.EXPO_PUBLIC_BACKEND_URL || ''
+)
+  .trim()
+  .replace(/\/+$/, '');
+
+function backendRequest(path, options = {}) {
+  if (!BACKEND_URL) {
+    throw new Error(
+      'Missing EXPO_PUBLIC_BACKEND_URL. ' +
+      'Please configure it in .env.local and restart Expo.'
+    );
+  }
+
+  return request(path, {
+    ...options,
+    baseUrl: BACKEND_URL,
+    auth: true,
+  });
+}
+
 export const backendApi = {
-  get: (path) => request(path, { baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
-  post: (path, body) => request(path, { method: 'POST', body, baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
-  patch: (path, body) => request(path, { method: 'PATCH', body, baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
-  delete: (path) => request(path, { method: 'DELETE', baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
+  get: (path) => backendRequest(path),
+
+  post: (path, body) =>
+    backendRequest(path, {
+      method: 'POST',
+      body,
+    }),
+
+  patch: (path, body) =>
+    backendRequest(path, {
+      method: 'PATCH',
+      body,
+    }),
+
+  delete: (path) =>
+    backendRequest(path, {
+      method: 'DELETE',
+    }),
 };
 
 /** Lấy toàn bộ túi xách. Ném lỗi nếu gọi thất bại (Home sẽ hiện nút "Try again"). */
