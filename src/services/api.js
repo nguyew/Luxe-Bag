@@ -76,8 +76,3 @@ export async function getHandbags() {
   if (!Array.isArray(data)) throw new Error('Unexpected response from the server.');
   return data;
 }
-
-/** Lấy một túi theo id (dùng cho Detail nếu cần tải lại). */
-export function getHandbagById(id) {
-  return api.get(`${RESOURCE}/${encodeURIComponent(id)}`);
-}

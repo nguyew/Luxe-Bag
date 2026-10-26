@@ -272,11 +272,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#E7E3DF',
   },
-  imageFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   genderBadge: {
     position: 'absolute',
     left: 14,

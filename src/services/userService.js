@@ -168,17 +168,6 @@ export async function updateUser(id, patch) {
   return toPublicUser(await api.put(path, { ...record, ...safePatch }));
 }
 
-/** (Admin) Danh sách tất cả tài khoản. */
-export async function listUsers() {
-  try {
-    const list = await api.get(ENDPOINT);
-    return Array.isArray(list) ? list.map(toPublicUser) : [];
-  } catch (error) {
-    if (error?.status === 404) return [];
-    throw error;
-  }
-}
-
 export const MAX_ADDRESSES = 10;
 
 /** Chuẩn hóa danh sách địa chỉ: bỏ mục sai, luôn có đúng một địa chỉ mặc định. */

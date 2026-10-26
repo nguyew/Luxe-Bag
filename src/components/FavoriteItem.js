@@ -96,11 +96,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#E7E3DF',
   },
-  thumbFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   genderBadge: {
     position: 'absolute',
     left: 6,
