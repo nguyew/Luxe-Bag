@@ -71,7 +71,7 @@ async function applyUser(user) {
 // Kiểm tra lại tài khoản với API (chạy ngầm, không chặn giao diện)
 async function revalidate(userId) {
   try {
-    const fresh = await getUserById(userId);
+    const fresh = await getUserById();
     if (!state.user || state.user.id !== userId) return; // đã đổi tài khoản
 
     if (fresh.status === 'disabled') {
@@ -81,8 +81,10 @@ async function revalidate(userId) {
     setState({ user: fresh });
     saveSession(fresh);
   } catch (error) {
-    // Tài khoản đã bị xóa -> đăng xuất. Lỗi khác (mất mạng...) -> giữ phiên cũ
-    if (error?.status === 404 && state.user?.id === userId) await logout();
+    // Tài khoản đã bị xóa/invalidated -> đăng xuất. Lỗi mạng -> giữ phiên cũ.
+    if ([401, 403, 404].includes(error?.status) && state.user?.id === userId) {
+      await logout();
+    }
   }
 }
 

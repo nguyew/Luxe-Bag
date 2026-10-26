@@ -102,9 +102,11 @@ export async function loginUser(email, password) {
   }
 }
 
-/** Lấy lại user theo id (dùng để làm mới phiên). Lỗi HTTP có `error.status`. */
-export async function getUserById(id) {
-  return toPublicUser(await api.get(`${ENDPOINT}/${encodeURIComponent(id)}`));
+/** Lấy lại user hiện tại từ backend (dùng để làm mới phiên). */
+export async function getUserById() {
+  const response = await backendApi.get(`${AUTH_ENDPOINT}/me`);
+  if (!response?.user) throw new Error('Unexpected response from the server.');
+  return toPublicUser(response.user);
 }
 
 // Các trường người dùng được phép tự sửa
