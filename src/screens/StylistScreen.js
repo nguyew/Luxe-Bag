@@ -23,7 +23,7 @@ import {
   isGeminiConfigured,
 } from '../services/geminiService';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
-import { formatPercentOff, formatPrice } from '../utils/format';
+import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 
 const SUGGESTIONS = [
   'A work bag under $600',
@@ -64,6 +64,9 @@ const PickCard = React.memo(function PickCard({ pick, favorite, onOpen, onToggle
         </Text>
 
         <View style={styles.pickMeta}>
+          {!!formatOriginalPrice(handbag) && (
+            <Text style={styles.pickOriginalPrice}>{formatOriginalPrice(handbag)}</Text>
+          )}
           <Text style={styles.pickPrice}>{formatPrice(handbag.cost)}</Text>
           {!!discount && <Text style={styles.pickDiscount}>{discount} off</Text>}
           {reviews.total > 0 && (
@@ -543,6 +546,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#1A1A1A',
+  },
+  pickOriginalPrice: {
+    fontSize: 12,
+    color: '#8A837B',
+    textDecorationLine: 'line-through',
   },
   pickDiscount: {
     fontSize: 11,

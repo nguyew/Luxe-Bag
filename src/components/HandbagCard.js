@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import RemoteImage from './RemoteImage';
-import { formatPercentOff, formatPrice } from '../utils/format';
+import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 import { isPurchasable } from '../utils/catalog';
 
 /**
@@ -110,6 +110,11 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
         </View>
 
         <View style={[styles.captionRight, !wide && styles.captionRightRow]}>
+          {!!formatOriginalPrice(item) && (
+            <Text style={{ textDecorationLine: 'line-through', color: '#8A837B', marginRight: 6 }}>
+              {formatOriginalPrice(item)}
+            </Text>
+          )}
           <Text style={styles.productCaptionPrice}>
             {formatPrice(item.cost)}
           </Text>

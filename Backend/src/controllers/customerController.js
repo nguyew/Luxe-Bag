@@ -160,9 +160,26 @@ const disableCustomer = async (req, res) => {
   return res.json({ customer: publicUser(customer) });
 };
 
+const enableCustomer = async (req, res) => {
+  const customer = await findCustomer(req.params.id);
+  if (!customer) {
+    return res.status(isValidId(req.params.id) ? 404 : 400).json({
+      error: isValidId(req.params.id) ? 'Customer not found.' : 'Invalid customer id.',
+    });
+  }
+  if (customer.status === 'active') {
+    return res.status(409).json({ error: 'Customer account is already active.' });
+  }
+
+  customer.status = 'active';
+  await customer.save();
+  return res.json({ customer: publicUser(customer) });
+};
+
 module.exports = {
   createCustomer,
   disableCustomer,
+  enableCustomer,
   getCustomer,
   listCustomers,
   updateCustomer,

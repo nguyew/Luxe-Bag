@@ -10,7 +10,7 @@ import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import useFavorites from '../hooks/useFavorites';
 import { useHandbag } from '../hooks/useHandbags';
-import { formatPercentOff, formatPrice } from '../utils/format';
+import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
 import { getStock, isPurchasable } from '../utils/catalog';
 import { tapLight } from '../utils/haptics';
@@ -149,6 +149,9 @@ export default function DetailScreen({ route, navigation }) {
         )}
 
         <View style={styles.priceRow}>
+          {!!formatOriginalPrice(handbag) && (
+            <Text style={styles.originalPrice}>{formatOriginalPrice(handbag)}</Text>
+          )}
           <Text style={styles.price}>{formatPrice(handbag.cost)}</Text>
           {!!stockLabel && (
             <View style={[styles.stockPill, !purchasable && styles.stockPillOut]}>
@@ -335,6 +338,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#1A1A1A',
+  },
+  originalPrice: {
+    fontSize: 16,
+    color: '#8A837B',
+    textDecorationLine: 'line-through',
   },
   discountPill: {
     paddingHorizontal: 10,
