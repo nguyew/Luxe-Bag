@@ -4,16 +4,17 @@
  * Admin products use the authenticated backend API:
  *  - Sản phẩm: `/api/admin/products`.
  *  - Khách hàng: authenticated backend API `/api/admin/customers`.
+ *  - Đơn hàng: authenticated backend API `/api/admin/orders`.
  *
  * Mọi thao tác ghi đều ĐỌC bản mới nhất rồi mới ghi lại, để không làm mất dữ
  * liệu khách vừa thay đổi (feedbacks, đơn mới...). Tuy vậy MockAPI không có
  * transaction: nếu khách và admin ghi vào cùng một bản ghi trong cùng một
  * khoảnh khắc, bản ghi sau cùng sẽ thắng.
  */
-import { api, backendApi, BASE_URL } from './api';
+import { api, backendApi, BACKEND_URL } from './api';
 import { getAuthToken } from './authToken';
 import { removeHandbag, upsertHandbag } from './handbagStore';
-import { OrderError, restoreOrderStock } from './orderService';
+import { OrderError } from './orderService';
 import { feedbackId } from '../utils/feedback';
 import { toPublicUser } from './userService';
 import { nextStatuses } from '../utils/orders';
@@ -26,10 +27,13 @@ const customerDisablePath = (id) => `${customerPath(id)}/disable`;
 const customerEnablePath = (id) => `${customerPath(id)}/enable`;
 
 export async function uploadProductImage(uri, contentType) {
+  if (!BACKEND_URL) {
+    throw new Error('Missing EXPO_PUBLIC_BACKEND_URL. Add it to your .env file and restart Expo.');
+  }
   const image = await (await fetch(uri)).blob();
   const token = await getAuthToken();
   const response = await fetch(
-    `${process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL}/api/admin/products/image-upload/proxy`,
+    `${BACKEND_URL}/api/admin/products/image-upload/proxy`,
     {
       method: 'POST',
       headers: {
@@ -90,10 +94,37 @@ export function fetchAdminUsers({ force = false } = {}) {
         page += 1;
       } while (page <= totalPages);
 
-      usersCache = customers.map((record) => ({
-        ...toPublicUser(record),
-        orders: asArray(record.orders),
-      }));
+      // Orders live in the Backend Order collection, not embedded in User records.
+      // Fetch them separately and attach to each customer for existing Admin screens.
+      const orders = [];
+      let orderPage = 1;
+      let orderTotalPages = 1;
+      do {
+        const response = await backendApi.get(`api/admin/orders?page=${orderPage}&limit=500`);
+        if (!Array.isArray(response?.orders)) {
+          throw new Error('Unexpected response from the admin orders endpoint.');
+        }
+        orders.push(...response.orders);
+        orderTotalPages = Number(response.pagination?.totalPages) || 1;
+        orderPage += 1;
+      } while (orderPage <= orderTotalPages);
+
+      const ordersByUser = new Map();
+      orders.forEach((order) => {
+        const ownerId = String(order.userId || '');
+        if (!ordersByUser.has(ownerId)) ordersByUser.set(ownerId, []);
+        ordersByUser.get(ownerId).push(order);
+      });
+
+      usersCache = customers.map((record) => {
+        const user = toPublicUser(record);
+        return {
+          ...user,
+          orders: (ordersByUser.get(String(user.id)) || []).sort(
+            (a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0)
+          ),
+        };
+      });
       usersCachedAt = Date.now();
       return usersCache;
     } finally {
@@ -237,42 +268,18 @@ export function deleteReview(handbagId, reviewId) {
  */
 export async function updateOrderStatus(userId, orderId, nextStatus) {
   try {
-    const path = userPath(userId);
-    const record = await api.get(path);
-    const orders = asArray(record.orders);
-    const index = orders.findIndex((order) => order.id === orderId);
-
-    if (index < 0) throw new OrderError('not_found');
-    const order = orders[index];
-    if (!nextStatuses(order.status).includes(nextStatus)) {
-      throw new OrderError('invalid_transition');
-    }
-
-    const now = new Date().toISOString();
-    const updated = {
-      ...order,
-      status: nextStatus,
-      history: [...asArray(order.history), { status: nextStatus, at: now }],
-    };
-    if (nextStatus === 'delivered' && order.paymentMethod === 'cod') {
-      updated.paymentStatus = 'paid';
-    }
-    if (nextStatus === 'cancelled') {
-      updated.cancelledAt = now;
-      if (order.paymentStatus === 'paid') updated.paymentStatus = 'refunded';
-    }
-
-    await api.put(path, {
-      ...record,
-      orders: orders.map((item, i) => (i === index ? updated : item)),
-    });
+    const response = await backendApi.patch(
+      `api/admin/orders/${encodeURIComponent(orderId)}/status`,
+      { status: nextStatus }
+    );
+    if (!response?.order) throw new Error('Unexpected response from the admin order endpoint.');
     invalidateAdminCache();
-
-    if (nextStatus === 'cancelled') await restoreOrderStock(order);
-    return updated;
+    return response.order;
   } catch (error) {
+    const code = error?.data?.code;
+    if (code) throw new OrderError(code, error.message, error.data?.details);
     if (error instanceof OrderError) throw error;
-    throw new OrderError('network');
+    throw new OrderError('network', error?.message || 'Unable to update the order.');
   }
 }
 
@@ -306,45 +313,21 @@ export async function setCustomerStatus(userId, status) {
 export async function resolveReturn(userId, orderId, decision, { restock = false, note = '' } = {}) {
   try {
     if (decision !== 'approve' && decision !== 'reject') throw new OrderError('invalid_return');
-
-    const path = userPath(userId);
-    const record = await api.get(path);
-    const orders = asArray(record.orders);
-    const index = orders.findIndex((order) => order.id === orderId);
-
-    if (index < 0) throw new OrderError('not_found');
-    const order = orders[index];
-    if (order.returnRequest?.status !== 'requested') throw new OrderError('invalid_return');
-
-    const approve = decision === 'approve';
-    const now = new Date().toISOString();
-    const updated = {
-      ...order,
-      returnRequest: {
-        ...order.returnRequest,
-        status: approve ? 'approved' : 'rejected',
-        resolvedAt: now,
-        adminNote: String(note ?? '').trim().slice(0, 300),
-        restocked: approve && !!restock,
-      },
-    };
-    if (approve) {
-      updated.status = 'returned';
-      updated.returnedAt = now;
-      if (order.paymentStatus === 'paid') updated.paymentStatus = 'refunded';
-      updated.history = [...asArray(order.history), { status: 'returned', at: now }];
-    }
-
-    await api.put(path, {
-      ...record,
-      orders: orders.map((item, i) => (i === index ? updated : item)),
-    });
+    const response = await backendApi.patch(
+      `api/admin/orders/${encodeURIComponent(orderId)}/return-request`,
+      {
+        decision,
+        restock: decision === 'approve' && !!restock,
+        note: String(note ?? '').trim().slice(0, 300),
+      }
+    );
+    if (!response?.order) throw new Error('Unexpected response from the admin return endpoint.');
     invalidateAdminCache();
-
-    if (approve && restock) await restoreOrderStock(order);
-    return updated;
+    return response.order;
   } catch (error) {
+    const code = error?.data?.code;
+    if (code) throw new OrderError(code, error.message, error.data?.details);
     if (error instanceof OrderError) throw error;
-    throw new OrderError('network');
+    throw new OrderError('network', error?.message || 'Unable to resolve the return request.');
   }
 }
