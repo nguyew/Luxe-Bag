@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const crypto = require('crypto');
+const { deleteObject, uploadObject } = require('../services/b2Storage');
 const { jwtExpiresIn, jwtSecret } = require('../config/env');
 const { publicUser } = require('../utils/user');
 
@@ -69,6 +71,57 @@ const login = async (req, res) => {
 
 const getCurrentUser = (req, res) => res.json({ user: publicUser(req.user) });
 
+const allowedAvatarTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const updateAvatar = async (req, res) => {
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (!allowedAvatarTypes.has(contentType)) {
+    return res.status(400).json({ error: 'Only JPEG, PNG, and WebP images are allowed.' });
+  }
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    return res.status(400).json({ error: 'An image body is required.' });
+  }
+  if (req.body.length > 5 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Profile photos must be 5 MB or smaller.' });
+  }
+
+  const extension = contentType === 'image/jpeg' ? 'jpg' : contentType.split('/')[1];
+  const key = `avatars/${req.user._id.toString()}/${crypto.randomUUID()}.${extension}`;
+  const avatarUrl = await uploadObject({ key, body: req.body, contentType });
+  const previousKey = req.user.avatarKey;
+
+  try {
+    req.user.avatarUrl = avatarUrl;
+    req.user.avatarKey = key;
+    await req.user.save();
+  } catch (error) {
+    try { await deleteObject(key); } catch { /* cleanup is best effort */ }
+    throw error;
+  }
+
+  if (previousKey && previousKey !== key) {
+    try { await deleteObject(previousKey); } catch (error) {
+      // A stale old object is preferable to failing a successful profile update.
+      console.warn('Could not delete previous profile avatar:', error.message);
+    }
+  }
+  return res.json({ user: publicUser(req.user) });
+};
+
+const deleteAvatar = async (req, res) => {
+  const previousKey = req.user.avatarKey;
+  req.user.avatarUrl = '';
+  req.user.avatarKey = '';
+  await req.user.save();
+  if (previousKey) {
+    try { await deleteObject(previousKey); } catch (error) {
+      console.warn('Could not delete profile avatar object:', error.message);
+    }
+  }
+  return res.json({ user: publicUser(req.user) });
+};
+
+
 const updateCurrentUser = async (req, res) => {
   const { name, phone, addresses } = req.body || {};
   const updates = {};
@@ -134,6 +187,8 @@ const updateCurrentUser = async (req, res) => {
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
+  updateAvatar,
+  deleteAvatar,
   login,
   register,
 };

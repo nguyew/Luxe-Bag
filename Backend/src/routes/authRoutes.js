@@ -1,7 +1,7 @@
 const express = require('express');
 const asyncHandler = require('../middleware/asyncHandler');
 const authenticate = require('../middleware/authenticate');
-const { getCurrentUser, updateCurrentUser, login, register } = require('../controllers/authController');
+const { getCurrentUser, updateCurrentUser, updateAvatar, deleteAvatar, login, register } = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -64,5 +64,14 @@ router.post('/login', asyncHandler(login));
 router.route('/me')
   .get(authenticate, getCurrentUser)
   .patch(authenticate, asyncHandler(updateCurrentUser));
+
+// Raw image uploads bypass JSON parsing and are stored in Backblaze B2.
+router.put(
+  '/me/avatar',
+  authenticate,
+  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
+  asyncHandler(updateAvatar)
+);
+router.delete('/me/avatar', authenticate, asyncHandler(deleteAvatar));
 
 module.exports = router;

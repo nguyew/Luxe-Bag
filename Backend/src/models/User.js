@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
     status: { type: String, enum: ['active', 'disabled'], default: 'active', index: true },
     phone: { type: String, trim: true, default: '' },
     avatarUrl: { type: String, trim: true, default: '' },
+    avatarKey: { type: String, trim: true, default: '' },
     addresses: {
       type: [{
         id: { type: String, required: true },
