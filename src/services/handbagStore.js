@@ -74,6 +74,14 @@ export function normalizeHandbags(list) {
     }));
 }
 
+/** Replace the shared catalog with an authoritative product list. */
+export function replaceHandbags(list) {
+  const items = normalizeHandbags(list);
+  const updatedAt = Date.now();
+  setState({ items, updatedAt, loading: false, refreshing: false, error: null });
+  persist(items, updatedAt);
+}
+
 // Đọc bản sao đã lưu (chỉ một lần). Không bao giờ ném lỗi.
 function hydrate() {
   if (!hydratePromise) {

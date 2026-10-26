@@ -41,6 +41,7 @@ Administrators can manage customer accounts with a JWT for an admin user:
 - `GET /api/admin/customers/:id` — view a customer
 - `PATCH /api/admin/customers/:id` — update customer profile or password
 - `PATCH /api/admin/customers/:id/disable` — disable a customer account
+- `PATCH /api/admin/customers/:id/enable` — enable a disabled customer account
 
 Administrators can manage handbag products:
 
@@ -49,6 +50,7 @@ Administrators can manage handbag products:
 - `POST /api/admin/products` — create a product
 - `GET /api/admin/products/:id` — view a product
 - `PATCH /api/admin/products/:id` — update a product
+- `POST /api/admin/products/bulk-discount` — apply or clear a real/display-only discount for all products, a product name, brand, or category
 - `DELETE /api/admin/products/:id` — permanently delete a product
 - `POST /api/admin/products/image-upload` — create a short-lived Backblaze B2 upload URL
 - `POST /api/admin/products/image-upload/proxy` — upload an image through the API (avoids browser-to-B2 CORS)

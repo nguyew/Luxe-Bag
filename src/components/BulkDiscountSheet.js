@@ -16,27 +16,42 @@ import FilterChips from './FilterChips';
 import { applyBulkDiscount } from '../services/adminService';
 
 /**
- * Giảm giá hàng loạt: chọn tất cả sản phẩm hoặc một thương hiệu, nhập % giảm.
+ * Giảm giá hàng loạt theo tên sản phẩm, thương hiệu hoặc danh mục.
  * Nhập 0 để xóa giảm giá. (percentOff lưu dạng thập phân: 20% -> 0.2)
  */
-export default function BulkDiscountSheet({ visible, items, onClose }) {
+export default function BulkDiscountSheet({ visible, items, onClose, onApplied }) {
   const insets = useSafeAreaInsets();
   const [target, setTarget] = useState('all');
+  const [discountMode, setDiscountMode] = useState('fake');
   const [percentText, setPercentText] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const names = useMemo(
+    () => [...new Set(items.map((item) => item.handbagName).filter(Boolean))].sort(),
+    [items]
+  );
   const brands = useMemo(
     () => [...new Set(items.map((item) => item.brand).filter(Boolean))].sort(),
     [items]
   );
+  const categories = useMemo(
+    () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort(),
+    [items]
+  );
   const options = useMemo(
-    () => [{ key: 'all', label: 'All products' }, ...brands.map((brand) => ({ key: brand, label: brand }))],
-    [brands]
+    () => [
+      { key: 'all', label: 'All products' },
+      ...names.map((name) => ({ key: `name:${name}`, label: `Name: ${name}` })),
+      ...brands.map((brand) => ({ key: `brand:${brand}`, label: `Brand: ${brand}` })),
+      ...categories.map((category) => ({ key: `category:${category}`, label: `Category: ${category}` })),
+    ],
+    [brands, categories, names]
   );
 
+  const [scope, targetValue] = target === 'all' ? ['all', ''] : target.split(':');
   const affected = useMemo(
-    () => items.filter((item) => target === 'all' || item.brand === target),
-    [items, target]
+    () => items.filter((item) => scope === 'all' || item[scope === 'name' ? 'handbagName' : scope] === targetValue),
+    [items, scope, targetValue]
   );
 
   const percent = Number(percentText);
@@ -45,9 +60,9 @@ export default function BulkDiscountSheet({ visible, items, onClose }) {
   const apply = () => {
     if (!valid || busy || affected.length === 0) return;
 
-    const what = percent === 0 ? 'Remove the “% off” label from' : `Set the “${percent}% off” label on`;
+    const what = percent === 0 ? 'Clear the discount from' : `${discountMode === 'real' ? 'Reduce the price and show' : 'Show'} a “${percent}% off” discount on`;
     Alert.alert(
-      'Apply label?',
+      'Apply discount?',
       `${what} ${affected.length} ${affected.length === 1 ? 'product' : 'products'}${
         target === 'all' ? '' : ` (${target})`
       }.`,
@@ -57,21 +72,21 @@ export default function BulkDiscountSheet({ visible, items, onClose }) {
           text: 'Apply',
           onPress: async () => {
             setBusy(true);
-            const result = await applyBulkDiscount(
-              affected.map((item) => item.id),
-              percent / 100
-            );
-            setBusy(false);
-
-            Alert.alert(
-              'Done',
-              result.failed.length === 0
-                ? `Updated ${result.updated} products.`
-                : `Updated ${result.updated} products. ${result.failed.length} failed – please try again.`
-            );
-            if (result.failed.length === 0) {
+            try {
+              const result = await applyBulkDiscount({
+                scope,
+                value: targetValue,
+                percentOff: percent / 100,
+                discountMode,
+              });
+              Alert.alert('Done', `Updated ${result.updated} products.`);
               setPercentText('');
+              onApplied?.();
               onClose();
+            } catch (error) {
+              Alert.alert('Could not apply discount', error.message || 'Please try again.');
+            } finally {
+              setBusy(false);
             }
           },
         },
@@ -86,7 +101,7 @@ export default function BulkDiscountSheet({ visible, items, onClose }) {
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <Text style={styles.title}>Bulk “% off” label</Text>
           <Text style={styles.sub}>
-            Sets the “% off” label shown on products. Prices stay the same – use discount codes for real price cuts.
+            Display-only discounts show a higher original price. Reduce-price discounts also change the selling price.
           </Text>
 
           <Text style={styles.label}>Apply to</Text>
@@ -111,13 +126,23 @@ export default function BulkDiscountSheet({ visible, items, onClose }) {
             {affected.length} {affected.length === 1 ? 'product' : 'products'} will be updated
           </Text>
 
+          <Text style={styles.label}>Discount type</Text>
+          <FilterChips
+            options={[
+              { key: 'fake', label: 'Display only' },
+              { key: 'real', label: 'Reduce price' },
+            ]}
+            value={discountMode}
+            onChange={setDiscountMode}
+          />
+
           <Pressable
             onPress={apply}
             disabled={!valid || busy || affected.length === 0}
             style={[styles.primary, (!valid || busy || affected.length === 0) && styles.disabled]}
             accessibilityRole="button"
           >
-            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Apply label</Text>}
+            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Apply discount</Text>}
           </Pressable>
           <Pressable onPress={onClose} disabled={busy} style={styles.cancel} accessibilityRole="button">
             <Text style={styles.cancelText}>Close</Text>

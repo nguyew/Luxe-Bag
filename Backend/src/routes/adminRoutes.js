@@ -5,6 +5,7 @@ const requireAdmin = require('../middleware/requireAdmin');
 const {
   createCustomer,
   disableCustomer,
+  enableCustomer,
   getCustomer,
   listCustomers,
   updateCustomer,
@@ -12,6 +13,7 @@ const {
 const {
   createImageUpload,
   createProduct,
+  bulkDiscount,
   deleteProduct,
   getProduct,
   listProducts,
@@ -53,6 +55,20 @@ router.use(authenticate, requireAdmin);
 router.route('/products')
   .post(asyncHandler(createProduct))
   .get(asyncHandler(listProducts));
+
+/**
+ * @swagger
+ * /api/admin/products/bulk-discount:
+ *   post:
+ *     tags: [Admin - Products]
+ *     summary: Apply a real or display-only discount to a product group
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Products updated }
+ *       400: { description: Validation failed }
+ */
+router.post('/products/bulk-discount', asyncHandler(bulkDiscount));
 
 /**
  * @swagger
@@ -263,5 +279,22 @@ router.route('/customers/:id')
  *       409: { description: Customer is already disabled }
  */
 router.patch('/customers/:id/disable', asyncHandler(disableCustomer));
+
+/**
+ * @swagger
+ * /api/admin/customers/{id}/enable:
+ *   patch:
+ *     tags: [Admin - Customers]
+ *     summary: Enable a disabled customer account
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Customer enabled }
+ *       404: { description: Customer not found }
+ *       409: { description: Customer is already active }
+ */
+router.patch('/customers/:id/enable', asyncHandler(enableCustomer));
 
 module.exports = router;

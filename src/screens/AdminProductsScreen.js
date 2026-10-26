@@ -18,29 +18,43 @@ import FilterChips from '../components/FilterChips';
 import ProductStatusBadge from '../components/ProductStatusBadge';
 import RemoteImage from '../components/RemoteImage';
 import SearchBox from '../components/SearchBox';
-import useHandbags from '../hooks/useHandbags';
+import { fetchAdminProducts } from '../services/adminService';
+import { normalizeHandbags, replaceHandbags } from '../services/handbagStore';
 import { LOW_STOCK_THRESHOLD, inventoryStats } from '../utils/admin';
 import { getStock } from '../utils/catalog';
-import { formatPercentOff, formatPrice } from '../utils/format';
+import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 
 const statusOf = (item) =>
   item.status === 'draft' || item.status === 'archived' ? item.status : 'published';
 
-const idValue = (item) => Number(item.id) || 0;
+const idValue = (item) => new Date(item.createdAt || 0).getTime() || 0;
 
 /** Danh sách sản phẩm cho admin: tìm kiếm, lọc theo trạng thái, thêm mới, giảm giá hàng loạt. */
 export default function AdminProductsScreen({ navigation }) {
-  const { allItems, loading, error, reload, revalidate } = useHandbags();
+  const [allItems, setAllItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [pulling, setPulling] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      revalidate();
-    }, [revalidate])
-  );
+  const loadProducts = useCallback(async () => {
+    try {
+      setError(null);
+      const products = normalizeHandbags(await fetchAdminProducts());
+      setAllItems(products);
+      replaceHandbags(products);
+    } catch (loadError) {
+      setError(loadError);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadProducts();
+  }, [loadProducts]));
 
   const stats = useMemo(() => inventoryStats(allItems), [allItems]);
 
@@ -75,9 +89,9 @@ export default function AdminProductsScreen({ navigation }) {
 
   const onRefresh = useCallback(async () => {
     setPulling(true);
-    await reload();
+    await loadProducts();
     setPulling(false);
-  }, [reload]);
+  }, [loadProducts]);
 
   const renderItem = useCallback(
     ({ item }) => <ProductRow item={item} onPress={openForm} />,
@@ -92,7 +106,7 @@ export default function AdminProductsScreen({ navigation }) {
     <View style={styles.center}>
       <Ionicons name="cloud-offline-outline" size={44} color="#77716A" />
       <Text style={styles.emptyTitle}>Couldn’t load products</Text>
-      <Pressable onPress={reload} style={styles.retry} accessibilityRole="button">
+      <Pressable onPress={loadProducts} style={styles.retry} accessibilityRole="button">
         <Text style={styles.retryText}>Try again</Text>
       </Pressable>
     </View>
@@ -153,6 +167,7 @@ export default function AdminProductsScreen({ navigation }) {
         visible={discountOpen}
         items={allItems}
         onClose={() => setDiscountOpen(false)}
+        onApplied={loadProducts}
       />
     </SafeAreaView>
   );
@@ -191,6 +206,9 @@ const ProductRow = React.memo(function ProductRow({ item, onPress }) {
           {item.handbagName}
         </Text>
         <View style={styles.priceRow}>
+          {!!formatOriginalPrice(item) && (
+            <Text style={styles.originalPrice}>{formatOriginalPrice(item)}</Text>
+          )}
           <Text style={styles.price}>{formatPrice(item.cost)}</Text>
           {!!discount && <Text style={styles.discount}>{discount} off</Text>}
         </View>
@@ -259,6 +277,7 @@ const styles = StyleSheet.create({
   },
   name: { marginTop: 1, fontSize: 14, lineHeight: 18, fontWeight: '600', color: '#1A1A1A' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  originalPrice: { fontSize: 12, color: '#8A837B', textDecorationLine: 'line-through' },
   price: { fontSize: 15, fontWeight: '800', color: '#0D0D0D' },
   discount: { fontSize: 11, fontWeight: '700', color: '#1F7A3E' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },

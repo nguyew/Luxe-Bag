@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import RemoteImage from './RemoteImage';
-import { formatPercentOff, formatPrice } from '../utils/format';
+import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 
 /**
  * Một dòng trong danh sách yêu thích: ảnh nhỏ, brand, tên, giá, % giảm
@@ -55,6 +55,9 @@ function FavoriteItem({ item, onOpen, onRemove }) {
         </View>
 
         <View style={styles.priceRow}>
+          {!!formatOriginalPrice(item) && (
+            <Text style={styles.originalPrice}>{formatOriginalPrice(item)}</Text>
+          )}
           <Text style={styles.price}>{formatPrice(item.cost)}</Text>
           {!!discount && (
             <View style={styles.discountPill}>
@@ -129,6 +132,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A1A1A',
   },
+  originalPrice: { textDecorationLine: 'line-through', color: '#8A837B', marginRight: 6 },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',

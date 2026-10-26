@@ -16,7 +16,7 @@ import { customerStats } from '../utils/admin';
 import { formatPrice } from '../utils/format';
 import { formatOrderDate } from '../utils/orders';
 
-/** Hồ sơ một khách hàng: thông tin, thống kê, đơn hàng, khóa / mở tài khoản. */
+/** Hồ sơ một khách hàng: thông tin, thống kê, đơn hàng và trạng thái tài khoản. */
 export default function AdminCustomerDetailScreen({ navigation, route }) {
   const { userId } = route.params;
   const { users, reload } = useAdminUsers();
@@ -37,24 +37,6 @@ export default function AdminCustomerDetailScreen({ navigation, route }) {
       setBusy(false);
     }
   }, [user, reload]);
-
-  const confirmToggle = () => {
-    const disabling = user.status !== 'disabled';
-    Alert.alert(
-      disabling ? 'Disable this account?' : 'Enable this account?',
-      disabling
-        ? `${user.name} will be signed out and will not be able to sign in until you enable the account again.`
-        : `${user.name} will be able to sign in again.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: disabling ? 'Disable' : 'Enable',
-          style: disabling ? 'destructive' : 'default',
-          onPress: toggle,
-        },
-      ]
-    );
-  };
 
   if (!user) {
     return (
@@ -127,10 +109,11 @@ export default function AdminCustomerDetailScreen({ navigation, route }) {
       </View>
 
       <Pressable
-        onPress={confirmToggle}
+        onPress={toggle}
         disabled={busy}
         style={[styles.toggle, disabled ? styles.toggleEnable : styles.toggleDisable, busy && styles.busy]}
         accessibilityRole="button"
+        accessibilityLabel={disabled ? 'Enable account' : 'Disable account'}
       >
         {busy ? (
           <ActivityIndicator color={disabled ? '#FFFFFF' : '#B3261E'} />

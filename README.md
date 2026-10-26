@@ -42,6 +42,11 @@ Requires Node.js 18+ and Expo Go (or an emulator).
 
 3. **Configure `.env`**: copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL` (and `EXPO_PUBLIC_GEMINI_API_KEY` if using AI Stylist).
    Add `.env` to `.gitignore`.
+   When running in Expo Go, do not use `localhost` for the backend URL:
+   `localhost` refers to the phone. Use the computer's LAN IPv4 address,
+   such as `http://192.168.1.25:5000`, and keep the phone and computer on the
+   same Wi-Fi network. Ensure the backend is running and allow port `5000`
+   through the Windows firewall if the phone still cannot connect.
 
 4. **Seed initial data**
    ```bash

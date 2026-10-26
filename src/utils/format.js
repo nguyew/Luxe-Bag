@@ -3,6 +3,14 @@ export const formatPrice = (price) =>
     maximumFractionDigits: 2,
   })}`;
 
+export const formatOriginalPrice = (item) => {
+  const original = Number(item?.originalCost);
+  const current = Number(item?.cost);
+  return Number.isFinite(original) && Number.isFinite(current) && original > current
+    ? formatPrice(original)
+    : '';
+};
+
 // percentOff trong API là số thập phân (0.42) -> hiển thị "42%"
 export const formatPercentOff = (value) => {
   const n = Number(value);

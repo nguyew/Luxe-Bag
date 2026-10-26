@@ -1,9 +1,9 @@
 /**
  * adminService – các thao tác của quản trị viên.
  *
- * Không có database thật nên admin đọc/ghi thẳng MockAPI:
- *  - Sản phẩm: resource `handbags`.
- *  - Đơn hàng & khách hàng: resource `users` (đơn nằm trong `users.orders`).
+ * Admin products use the authenticated backend API:
+ *  - Sản phẩm: `/api/admin/products`.
+ *  - Khách hàng: authenticated backend API `/api/admin/customers`.
  *
  * Mọi thao tác ghi đều ĐỌC bản mới nhất rồi mới ghi lại, để không làm mất dữ
  * liệu khách vừa thay đổi (feedbacks, đơn mới...). Tuy vậy MockAPI không có
@@ -21,6 +21,9 @@ import { nextStatuses } from '../utils/orders';
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const handbagPath = (id) => `api/admin/products/${encodeURIComponent(id)}`;
 const userPath = (id) => `users/${encodeURIComponent(id)}`;
+const customerPath = (id) => `api/admin/customers/${encodeURIComponent(id)}`;
+const customerDisablePath = (id) => `${customerPath(id)}/disable`;
+const customerEnablePath = (id) => `${customerPath(id)}/enable`;
 
 export async function uploadProductImage(uri, contentType) {
   const image = await (await fetch(uri)).blob();
@@ -62,7 +65,7 @@ export function invalidateAdminCache() {
 }
 
 /**
- * Tất cả tài khoản kèm mảng `orders`. Không bao giờ trả về passwordHash/salt.
+ * Tất cả tài khoản từ backend. Không bao giờ trả về passwordHash/salt.
  * `force` = true: bỏ qua bộ nhớ đệm.
  */
 export function fetchAdminUsers({ force = false } = {}) {
@@ -73,15 +76,21 @@ export function fetchAdminUsers({ force = false } = {}) {
 
   usersInflight = (async () => {
     try {
-      let list;
-      try {
-        list = await api.get('users');
-      } catch (error) {
-        if (error?.status === 404) list = []; // MockAPI trả 404 khi chưa có bản ghi nào
-        else throw error;
-      }
+      const customers = [];
+      let page = 1;
+      let totalPages = 1;
 
-      usersCache = (Array.isArray(list) ? list : []).map((record) => ({
+      do {
+        const response = await backendApi.get(`api/admin/customers?page=${page}&limit=100`);
+        if (!Array.isArray(response?.customers)) {
+          throw new Error('Unexpected response from the admin customers endpoint.');
+        }
+        customers.push(...response.customers);
+        totalPages = Number(response.pagination?.totalPages) || 1;
+        page += 1;
+      } while (page <= totalPages);
+
+      usersCache = customers.map((record) => ({
         ...toPublicUser(record),
         orders: asArray(record.orders),
       }));
@@ -103,7 +112,9 @@ const PRODUCT_FIELDS = [
   'brand',
   'category',
   'cost',
+  'originalCost',
   'percentOff',
+  'discountMode',
   'color',
   'gender',
   'uri',
@@ -127,6 +138,15 @@ export async function createHandbag(data) {
   const created = response.product;
   upsertHandbag(created);
   return created;
+}
+
+/** Load every product for the admin catalog, including drafts and archived products. */
+export async function fetchAdminProducts() {
+  const response = await backendApi.get('api/admin/products');
+  if (!Array.isArray(response?.products)) {
+    throw new Error('Unexpected response from the admin products endpoint.');
+  }
+  return response.products;
 }
 
 /** Sửa sản phẩm: chỉ ghi đè các trường được truyền vào, giữ nguyên phần còn lại (feedbacks...). */
@@ -162,8 +182,23 @@ export async function bulkUpdateHandbags(ids, patch) {
   return { updated, failed };
 }
 
-/** Đặt % giảm giá cho nhiều sản phẩm. percentOff là số thập phân (0.2 = 20%). */
-export const applyBulkDiscount = (ids, percentOff) => bulkUpdateHandbags(ids, { percentOff });
+/**
+ * Áp dụng giảm giá theo nhóm. `real` giảm giá bán; `fake` chỉ tạo giá gốc
+ * hiển thị cao hơn mà không thay đổi giá bán hiện tại.
+ */
+export async function applyBulkDiscount({ scope, value, percentOff, discountMode }) {
+  const response = await backendApi.post('api/admin/products/bulk-discount', {
+    scope,
+    ...(scope === 'all' ? {} : { value }),
+    percentOff,
+    discountMode,
+  });
+  if (!Number.isInteger(response?.updated) || !Array.isArray(response.products)) {
+    throw new Error('Unexpected response from the bulk discount endpoint.');
+  }
+  response.products.forEach(upsertHandbag);
+  return { updated: response.updated, failed: [] };
+}
 
 // ---------------------------------------------------------------------------
 // Kiểm duyệt đánh giá
@@ -250,13 +285,13 @@ export async function setCustomerStatus(userId, status) {
     throw new Error('Invalid status.');
   }
 
-  const path = userPath(userId);
-  const record = await api.get(path);
-  if (record.role === 'admin') throw new Error('Admin accounts cannot be changed here.');
-
-  const saved = await api.put(path, { ...record, status });
+  const path = status === 'disabled' ? customerDisablePath(userId) : customerEnablePath(userId);
+  const response = await backendApi.patch(path);
+  if (!response?.customer) {
+    throw new Error('Unexpected response from the admin customer endpoint.');
+  }
   invalidateAdminCache();
-  return toPublicUser(saved);
+  return toPublicUser(response.customer);
 }
 
 // ---------------------------------------------------------------------------
