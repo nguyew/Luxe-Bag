@@ -2,11 +2,9 @@
  * Order service.
  * Customer order operations use the authenticated LuxeBag Backend. Product
  * pricing, stock reservation, totals, ownership checks, and order persistence
- * are performed server-side. The legacy MockAPI stock helper remains exported
- * only for the older Admin service until that service is migrated.
+ * are performed server-side. Stock changes are handled exclusively by Backend.
  */
-import { api, backendApi } from './api';
-import { getStock } from '../utils/catalog';
+import { backendApi } from './api';
 import {
   PAYMENT_METHODS,
   RETURN_REASONS,
@@ -63,52 +61,6 @@ function toOrderError(error) {
     || (error?.code === 'timeout' ? 'timeout' : null)
     || 'network';
   return new OrderError(code, data.error || data.message || error?.message, details);
-}
-
-const asArray = (value) => (Array.isArray(value) ? value : []);
-
-/**
- * Legacy MockAPI stock helper. The new Backend checkout/cancellation flows do
- * not call this; stock changes for Backend orders are handled on the server.
- * It is kept temporarily because the existing Admin service still imports it.
- */
-const legacyHandbagPath = (id) => `handbags/${encodeURIComponent(id)}`;
-
-async function fetchLegacyHandbag(id) {
-  try {
-    return await api.get(legacyHandbagPath(id));
-  } catch (error) {
-    if (error?.status === 404) return null;
-    throw error;
-  }
-}
-
-async function adjustLegacyStock(id, delta) {
-  const record = await fetchLegacyHandbag(id);
-  if (!record) return;
-  const stock = getStock(record);
-  if (stock === null) return;
-  await api.put(legacyHandbagPath(id), {
-    ...record,
-    stock: Math.max(0, stock + delta),
-  });
-}
-
-async function restoreLegacyStock(entries) {
-  for (const entry of entries) {
-    try {
-      await adjustLegacyStock(entry.id, entry.qty);
-    } catch {
-      // Best effort for legacy MockAPI orders only.
-    }
-  }
-}
-
-/** Legacy helper retained for the current Admin service during migration. */
-export async function restoreOrderStock(order) {
-  await restoreLegacyStock(
-    asArray(order?.items).map((item) => ({ id: item.handbagId, qty: Number(item.qty) || 0 }))
-  );
 }
 
 function sortNewestFirst(orders) {
