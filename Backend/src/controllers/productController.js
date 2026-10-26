@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const Product = require('../models/Product');
+const Review = require('../models/Review');
 const { createUpload, deleteObject, uploadObject } = require('../services/b2Storage');
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -42,10 +43,37 @@ const createSlug = (body) => {
 const findById = (id) => mongoose.isValidObjectId(id) ? Product.findById(id) : null;
 const sendNotFound = (res, id) => res.status(mongoose.isValidObjectId(id) ? 404 : 400).json({ error: mongoose.isValidObjectId(id) ? 'Product not found.' : 'Invalid product id.' });
 
+const attachFeedbacks = async (products, includeHidden = false) => {
+  if (!products.length) return products;
+  const ids = products.map((product) => product._id);
+  const filter = { productId: { $in: ids } };
+  if (!includeHidden) filter.hidden = false;
+  const reviews = await Review.find(filter).sort({ createdAt: -1 });
+  const grouped = new Map();
+  for (const review of reviews) {
+    const key = String(review.productId);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push({
+      id: String(review._id),
+      userId: String(review.userId),
+      author: review.author || 'Anonymous',
+      rating: Number(review.rating),
+      comment: review.comment || '',
+      date: new Date(review.createdAt).toISOString(),
+      hidden: review.hidden === true,
+    });
+  }
+  return products.map((product) => ({
+    ...(product.toObject ? product.toObject() : product),
+    id: String(product._id || product.id),
+    feedbacks: grouped.get(String(product._id || product.id)) || [],
+  }));
+};
+
 const listProducts = async (req, res) => {
   const filter = req.user ? {} : { status: 'published' };
   const products = await Product.find(filter).sort({ createdAt: -1 });
-  return res.json({ products });
+  return res.json({ products: await attachFeedbacks(products, req.user?.role === 'admin') });
 };
 
 const getProduct = async (req, res) => {
@@ -53,7 +81,8 @@ const getProduct = async (req, res) => {
     ? Product.findOne(req.user ? { _id: req.params.id } : { _id: req.params.id, status: 'published' })
     : null);
   if (!product) return sendNotFound(res, req.params.id);
-  return res.json({ product });
+  const [withFeedbacks] = await attachFeedbacks([product], req.user?.role === 'admin');
+  return res.json({ product: withFeedbacks });
 };
 
 const createProduct = async (req, res) => {

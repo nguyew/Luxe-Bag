@@ -22,6 +22,7 @@ const {
 } = require('../controllers/productController');
 
 const { listAdminOrders, updateAdminOrderStatus, resolveAdminReturn } = require('../controllers/adminOrderController');
+const { deleteAdminReview, listAdminReviews, moderateReview } = require('../controllers/reviewController');
 
 const router = express.Router();
 
@@ -31,6 +32,9 @@ router.use(authenticate, requireAdmin);
 router.get('/orders', asyncHandler(listAdminOrders));
 router.patch('/orders/:id/status', asyncHandler(updateAdminOrderStatus));
 router.patch('/orders/:id/return-request', asyncHandler(resolveAdminReturn));
+router.get('/reviews', asyncHandler(listAdminReviews));
+router.patch('/reviews/:reviewId/moderation', asyncHandler(moderateReview));
+router.delete('/reviews/:reviewId', asyncHandler(deleteAdminReview));
 
 /**
  * @swagger
