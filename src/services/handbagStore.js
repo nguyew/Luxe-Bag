@@ -67,11 +67,68 @@ export function normalizeHandbags(list) {
 
   return list
     .filter((item) => item && typeof item === 'object')
-    .map((item, index) => ({
-      ...item,
-      id: ensureId(item, index),
-      uri: item.uri || item.image || item.imageUrl || '',
-    }));
+    .map((item, index) => {
+      const images = Array.isArray(item.images) ? item.images : [];
+
+      const primaryImage =
+        images.find((image) => image?.isPrimary && image?.url) ||
+        images.find((image) => image?.url);
+
+      const uri =
+        item.uri ||
+        item.image ||
+        item.imageUrl ||
+        primaryImage?.url ||
+        '';
+
+      const name =
+        item.name ||
+        item.handbagName ||
+        item.productName ||
+        '';
+
+      const price =
+        item.price ??
+        item.cost ??
+        0;
+
+      const percentOff =
+        item.discountPercent ??
+        item.percentOff ??
+        0;
+
+      return {
+        ...item,
+
+        id: ensureId(item, index),
+
+        // Chuẩn hóa tên sản phẩm
+        name,
+        handbagName: item.handbagName || name,
+
+        // Chuẩn hóa giá
+        price,
+        cost: item.cost ?? price,
+
+        // Chuẩn hóa hình ảnh
+        uri,
+        image: item.image || uri,
+        imageUrl: item.imageUrl || uri,
+
+        // Chuẩn hóa giảm giá
+        percentOff,
+        discountPercent: item.discountPercent ?? percentOff,
+
+        // Chuẩn hóa màu sắc
+        colors: Array.isArray(item.colors)
+          ? item.colors
+          : Array.isArray(item.color)
+            ? item.color
+            : item.color
+              ? [item.color]
+              : [],
+      };
+    });
 }
 
 // Đọc bản sao đã lưu (chỉ một lần). Không bao giờ ném lỗi.

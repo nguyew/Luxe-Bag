@@ -27,7 +27,7 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
     <Pressable
       onPress={() => onOpen?.(item)}
       accessibilityRole="button"
-      accessibilityLabel={`${item.handbagName}, ${item.brand || ''}, ${formatPrice(item.cost)}`}
+      accessibilityLabel={`${item.handbagName}, ${item.brand || ''}, ${formatPrice(item.cost ?? item.price ?? 0)}`}
       style={[
         styles.productCard,
         wide ? styles.wideCard : styles.squareCard,
@@ -99,19 +99,22 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
           - Thẻ rộng: brand + tên bên trái, giá + % giảm bên phải. */}
       <View style={[styles.productCaption, !wide && styles.captionStacked]}>
         <View style={[styles.captionLeft, !wide && styles.captionLeftStacked]}>
-          {!!item.brand && (
-            <Text style={styles.productCaptionBrand} numberOfLines={1}>
-              {item.brand}
-            </Text>
-          )}
+          {typeof item.brand === 'string' &&
+            item.brand.trim() !== '' &&
+            !/^[a-f\d]{24}$/i.test(item.brand) && (
+              <Text style={styles.productCaptionBrand} numberOfLines={1}>
+                {item.brand}
+              </Text>
+            )}
+
           <Text style={styles.productCaptionName} numberOfLines={2}>
-            {item.handbagName}
+            {item.handbagName || item.name || item.productName || 'Unnamed Bag'}
           </Text>
         </View>
 
         <View style={[styles.captionRight, !wide && styles.captionRightRow]}>
           <Text style={styles.productCaptionPrice}>
-            {formatPrice(item.cost)}
+            {formatPrice(item.cost ?? item.price ?? 0)}
           </Text>
           {!!formatPercentOff(item.percentOff) && (
             <View style={[styles.discountPill, !wide && styles.discountPillRow]}>

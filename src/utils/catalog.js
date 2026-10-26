@@ -21,10 +21,21 @@ export function unitPrice(handbag) {
  * (null = không giới hạn, để app vẫn chạy khi chưa chạy seed-stock).
  */
 export function getStock(handbag) {
-  const raw = handbag?.stock;
-  if (raw === undefined || raw === null || raw === '') return null;
+  // Ưu tiên trường tồn kho chính của backend.
+  // Dùng stock cho dữ liệu cũ nếu inventoryQuantity không tồn tại.
+  const raw =
+    handbag?.inventoryQuantity ??
+    handbag?.stock;
+
+  if (raw === undefined || raw === null || raw === '') {
+    return null;
+  }
+
   const stock = Number(raw);
-  return Number.isFinite(stock) ? Math.max(0, Math.floor(stock)) : null;
+
+  return Number.isFinite(stock)
+    ? Math.max(0, Math.floor(stock))
+    : null;
 }
 
 /** Sản phẩm đã xuất bản (thiếu `status` coi như đã xuất bản). */
@@ -41,3 +52,4 @@ export function maxQtyFor(handbag) {
 export function isPurchasable(handbag) {
   return !!handbag && isPublished(handbag) && maxQtyFor(handbag) > 0;
 }
+
