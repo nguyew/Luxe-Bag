@@ -14,6 +14,8 @@ The product is planned for two roles:
 - **Admin**: use a protected administration area to manage customers, products,
   inventory, catalog metadata, orders, returns/refunds, reviews, promotions,
   sales reports, and account status.
+- Admin: admin@luxebag.com / Admin@123
+- Customer: customer@luxebag.com / Customer@123
 
 Some customer and admin foundations already exist, but the roadmap below is
 the source of truth for planned capabilities. Do not assume a listed feature

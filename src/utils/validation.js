@@ -3,7 +3,7 @@
  * Mỗi hàm trả về chuỗi lỗi, hoặc '' nếu hợp lệ.
  */
 export const NAME_MAX_LENGTH = 40;
-export const PASSWORD_MIN_LENGTH = 6;
+export const PASSWORD_MIN_LENGTH = 8;
 
 export function validateName(value) {
   const name = String(value ?? '').trim();

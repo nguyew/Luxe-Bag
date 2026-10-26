@@ -1,17 +1,10 @@
 /**
- * userService – tài khoản người dùng lưu trong resource `users` của MockAPI.
+ * userService – tài khoản người dùng từ API của LuxeBag.
  *
- * Mỗi record: { id, name, email, passwordHash, salt, role, status, phone,
- *               createdAt, addresses[], orders[] }
- *  - role:   'customer' | 'admin'   (admin chỉ tạo bằng scripts/seed-admin.js)
- *  - status: 'active' | 'disabled'  (tài khoản bị vô hiệu hóa không đăng nhập được)
- *
- * LƯU Ý BẢO MẬT: MockAPI không có xác thực thật. Mật khẩu được băm SHA-256
- * kèm salt riêng nên không lưu chữ thô, nhưng ai biết URL vẫn đọc/ghi được
- * API. Việc kiểm tra mật khẩu và role ở đây chỉ để mô phỏng cho bài tập.
+ * Authentication uses the backend's /api/auth endpoints. Other account
+ * operations continue to use the configured resource API.
  */
-import * as Crypto from 'expo-crypto';
-import { api } from './api';
+import { api, backendApi } from './api';
 import {
   validateEmail,
   validateName,
@@ -21,6 +14,7 @@ import {
 } from '../utils/validation';
 
 const ENDPOINT = 'users';
+const AUTH_ENDPOINT = 'api/auth';
 
 export class AuthError extends Error {
   constructor(code, message) {
@@ -49,7 +43,7 @@ export function describeAuthError(error) {
 
 export const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
 
-// Chỉ trả về các trường an toàn: KHÔNG có passwordHash/salt và không kèm orders
+// Chỉ trả về các trường an toàn và không kèm dữ liệu riêng tư khác.
 export function toPublicUser(record) {
   return {
     id: String(record.id),
@@ -64,28 +58,6 @@ export function toPublicUser(record) {
   };
 }
 
-// Thuật toán băm: sha256("<salt>:<mật khẩu>") dạng hex.
-// scripts/seed-admin.js phải dùng đúng công thức này.
-export async function hashPassword(password, salt) {
-  return Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `${salt}:${password}`
-  );
-}
-
-// MockAPI lọc theo kiểu "chứa chuỗi" và trả 404 khi không có kết quả,
-// nên phải so sánh chính xác lại ở client và coi 404 là "không có".
-async function findRecordByEmail(email) {
-  try {
-    const list = await api.get(`${ENDPOINT}?email=${encodeURIComponent(email)}`);
-    if (!Array.isArray(list)) return null;
-    return list.find((item) => normalizeEmail(item.email) === email) || null;
-  } catch (error) {
-    if (error?.status === 404) return null;
-    throw error;
-  }
-}
-
 // Mọi lỗi không phải AuthError (mất mạng, quá hạn, 5xx...) đều quy về 'network'
 function asAuthError(error) {
   return error instanceof AuthError ? error : new AuthError('network');
@@ -98,25 +70,15 @@ export async function registerUser({ name, email, password }) {
   if (invalid) throw new AuthError('invalid_input', invalid);
 
   try {
-    const normalized = normalizeEmail(email);
-    if (await findRecordByEmail(normalized)) throw new AuthError('email_taken');
-
-    const salt = Crypto.randomUUID();
-    const created = await api.post(ENDPOINT, {
+    const response = await backendApi.post(`${AUTH_ENDPOINT}/register`, {
       name: String(name).trim(),
-      email: normalized,
-      passwordHash: await hashPassword(password, salt),
-      salt,
-      role: 'customer', // luôn là khách hàng; admin tạo bằng script
-      status: 'active',
-      phone: '',
-      createdAt: new Date().toISOString(),
-      addresses: [],
-      orders: [],
+      email: normalizeEmail(email),
+      password,
     });
-
-    return toPublicUser(created);
+    if (!response?.user) throw new Error('Unexpected response from the server.');
+    return { user: toPublicUser(response.user), token: response.token };
   } catch (error) {
+    if (error?.status === 409) throw new AuthError('email_taken');
     throw asAuthError(error);
   }
 }
@@ -127,19 +89,15 @@ export async function loginUser(email, password) {
   if (invalid) throw new AuthError('invalid_input', invalid);
 
   try {
-    const record = await findRecordByEmail(normalizeEmail(email));
-
-    // Cùng một thông báo cho "sai email" và "sai mật khẩu" để không lộ email nào có tài khoản
-    if (!record || !record.salt || !record.passwordHash) {
-      throw new AuthError('invalid_credentials');
-    }
-    if ((await hashPassword(password, record.salt)) !== record.passwordHash) {
-      throw new AuthError('invalid_credentials');
-    }
-    if (record.status === 'disabled') throw new AuthError('disabled');
-
-    return toPublicUser(record);
+    const response = await backendApi.post(`${AUTH_ENDPOINT}/login`, {
+      email: normalizeEmail(email),
+      password,
+    });
+    if (!response?.user) throw new Error('Unexpected response from the server.');
+    return { user: toPublicUser(response.user), token: response.token };
   } catch (error) {
+    if (error?.status === 401) throw new AuthError('invalid_credentials');
+    if (error?.status === 403) throw new AuthError('disabled');
     throw asAuthError(error);
   }
 }

@@ -2,19 +2,9 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { jwtExpiresIn, jwtSecret } = require('../config/env');
+const { publicUser } = require('../utils/user');
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const publicUser = (user) => ({
-  id: user._id.toString(),
-  name: user.name,
-  email: user.email,
-  role: user.role,
-  status: user.status,
-  phone: user.phone,
-  avatarUrl: user.avatarUrl,
-  createdAt: user.createdAt,
-});
 
 const issueToken = (user) => jwt.sign(
   { sub: user._id.toString(), role: user.role },

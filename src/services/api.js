@@ -16,12 +16,12 @@ export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || '')
   .replace(/\/+$/, '') // bỏ dấu "/" ở cuối
   .replace(/\/handbags$/i, ''); // lỡ dán cả "/handbags" thì tự bỏ đi
 
-const RESOURCE = 'handbags';
+const RESOURCE = 'api/products';
 const TIMEOUT_MS = 10000;
 
 // fetch có giới hạn thời gian; lỗi mạng, quá hạn hay HTTP lỗi đều ném Error
-async function request(path, { method = 'GET', body } = {}) {
-  if (!BASE_URL) {
+async function request(path, { method = 'GET', body, baseUrl = BASE_URL, auth = false } = {}) {
+  if (!baseUrl) {
     throw new Error(
       'Missing EXPO_PUBLIC_API_URL. Add it to your .env file and restart Expo.'
     );
@@ -32,11 +32,17 @@ async function request(path, { method = 'GET', body } = {}) {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${BASE_URL}/${path}`, {
+    const headers = hasBody
+      ? { Accept: 'application/json', 'Content-Type': 'application/json' }
+      : { Accept: 'application/json' };
+    if (auth) {
+      const { getAuthToken } = await import('./authToken');
+      const token = await getAuthToken();
+      if (token) headers.Authorization = 'Bearer ' + token;
+    }
+    const response = await fetch(`${baseUrl}/${path}`, {
       method,
-      headers: hasBody
-        ? { Accept: 'application/json', 'Content-Type': 'application/json' }
-        : { Accept: 'application/json' },
+      headers,
       body: hasBody ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
@@ -68,9 +74,17 @@ export const api = {
   delete: (path) => request(path, { method: 'DELETE' }),
 };
 
+export const backendApi = {
+  get: (path) => request(path, { baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
+  post: (path, body) => request(path, { method: 'POST', body, baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
+  patch: (path, body) => request(path, { method: 'PATCH', body, baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
+  delete: (path) => request(path, { method: 'DELETE', baseUrl: process.env.EXPO_PUBLIC_BACKEND_URL || BASE_URL, auth: true }),
+};
+
 /** Lấy toàn bộ túi xách. Ném lỗi nếu gọi thất bại (Home sẽ hiện nút "Try again"). */
 export async function getHandbags() {
-  const data = await api.get(RESOURCE);
+  const response = await backendApi.get(RESOURCE);
+  const data = response?.products;
   // Không trả về [] khi dữ liệu lạ: nếu vậy kho dữ liệu sẽ tưởng cửa hàng
   // trống và ghi đè bản sao tốt đang có
   if (!Array.isArray(data)) throw new Error('Unexpected response from the server.');

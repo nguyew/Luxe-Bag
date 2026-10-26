@@ -20,6 +20,7 @@ import {
 import { setCartOwner } from './cartService';
 import { setFavoritesOwner } from './favoriteService';
 import { setProfileOwner } from './profileService';
+import { setAuthToken } from './authToken';
 
 const SESSION_KEY = '@luxebag/session';
 
@@ -113,15 +114,20 @@ async function startSession(user) {
 
 /** Đăng nhập. Ném AuthError nếu sai thông tin / tài khoản bị khóa / mất mạng. */
 export async function login(email, password) {
-  return startSession(await loginUser(email, password));
+  const session = await loginUser(email, password);
+  await setAuthToken(session.token);
+  return startSession(session.user);
 }
 
 /** Đăng ký rồi đăng nhập luôn. */
 export async function register({ name, email, password }) {
-  return startSession(await registerUser({ name, email, password }));
+  const session = await registerUser({ name, email, password });
+  await setAuthToken(session.token);
+  return startSession(session.user);
 }
 
 export async function logout() {
+  await setAuthToken(null);
   await saveSession(null);
   await applyUser(null);
 }
