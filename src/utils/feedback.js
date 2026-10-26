@@ -1,7 +1,7 @@
 /**
  * Tiện ích xử lý feedback của túi xách.
  *
- * Mỗi handbag trên MockAPI có thêm trường `feedbacks` (mảng):
+ * Mỗi sản phẩm từ Backend có thêm trường `feedbacks` (mảng):
  *   { id, author, rating (1-5), comment, date (ISO), userId?, hidden? }
  *  - userId: tài khoản đã viết (đánh giá do khách viết trong app); dữ liệu mẫu không có
  *  - hidden: true khi admin đã ẩn (kiểm duyệt)
