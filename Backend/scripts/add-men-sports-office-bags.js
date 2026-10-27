@@ -222,13 +222,29 @@ async function run() {
   }
 
   // Upsert Products
+  // Upsert Products
   for (const bag of menBags) {
+    const slug = bag.handbagName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
     await Product.updateOne(
       { handbagName: bag.handbagName },
-      { $set: bag },
+      {
+        $set: {
+          ...bag,
+          slug,
+        },
+      },
       { upsert: true }
     );
-    console.log(`Men Bag upserted: ${bag.handbagName} (${bag.brand} - ${bag.category})`);
+
+    console.log(
+      `Men Bag upserted: ${bag.handbagName} (${bag.brand} - ${bag.category})`
+    );
   }
 
   const totalProducts = await Product.countDocuments();
