@@ -141,7 +141,11 @@ export default function DetailScreen({ route, navigation }) {
         </View>
 
         {/* Thông tin chính */}
-        {!!handbag.brand && <Text style={styles.brand}>{isDatabaseId(handbag.brand) ? 'Other' : handbag.brand}</Text>}
+        {!!handbag.brand && (
+          <Text style={styles.brand}>
+            {isDatabaseId(handbag.brand) ? 'Other' : handbag.brand}
+          </Text>
+        )}
         <Text style={styles.name}>{handbag.handbagName}</Text>
 
         {summary.total > 0 && (
@@ -154,10 +158,10 @@ export default function DetailScreen({ route, navigation }) {
         )}
 
         <View style={styles.priceRow}>
+          <Text style={styles.price}>{formatPrice(handbag.cost)}</Text>
           {!!formatOriginalPrice(handbag) && (
             <Text style={styles.originalPrice}>{formatOriginalPrice(handbag)}</Text>
           )}
-          <Text style={styles.price}>{formatPrice(handbag.cost)}</Text>
           {!!stockLabel && (
             <View style={[styles.stockPill, !purchasable && styles.stockPillOut]}>
               <Text style={[styles.stockText, !purchasable && styles.stockTextOut]}>
@@ -173,24 +177,40 @@ export default function DetailScreen({ route, navigation }) {
         </View>
 
         {/* Thuộc tính */}
+        <Text style={styles.sectionTitle}>Details</Text>
         <View style={styles.infoCard}>
           {!!handbag.category && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Category</Text>
+              <View style={styles.infoLabelWrap}>
+                <View style={styles.infoIcon}>
+                  <Ionicons name="grid-outline" size={15} color="#55514C" />
+                </View>
+                <Text style={styles.infoLabel}>Category</Text>
+              </View>
               <Text style={styles.infoValue}>{isDatabaseId(handbag.category) ? 'Uncategorized' : handbag.category}</Text>
             </View>
           )}
 
           {!!handbag.brand && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Brand</Text>
+              <View style={styles.infoLabelWrap}>
+                <View style={styles.infoIcon}>
+                  <Ionicons name="ribbon-outline" size={15} color="#55514C" />
+                </View>
+                <Text style={styles.infoLabel}>Brand</Text>
+              </View>
               <Text style={styles.infoValue}>{isDatabaseId(handbag.brand) ? 'Other' : handbag.brand}</Text>
             </View>
           )}
 
           {hasGender && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>For</Text>
+              <View style={styles.infoLabelWrap}>
+                <View style={styles.infoIcon}>
+                  <Ionicons name="person-outline" size={15} color="#55514C" />
+                </View>
+                <Text style={styles.infoLabel}>For</Text>
+              </View>
               <View style={styles.genderValue}>
                 <Ionicons
                   name={handbag.gender ? 'female' : 'male'}
@@ -206,9 +226,14 @@ export default function DetailScreen({ route, navigation }) {
 
           {colors.length > 0 && (
             <View style={[styles.infoRow, styles.infoRowLast]}>
-              <Text style={styles.infoLabel}>
-                {colors.length > 1 ? 'Colors' : 'Color'}
-              </Text>
+              <View style={styles.infoLabelWrap}>
+                <View style={styles.infoIcon}>
+                  <Ionicons name="color-palette-outline" size={15} color="#55514C" />
+                </View>
+                <Text style={styles.infoLabel}>
+                  {colors.length > 1 ? 'Colors' : 'Color'}
+                </Text>
+              </View>
               <View style={styles.colorList}>
                 {colors.map((name) => (
                   <View key={String(name)} style={styles.colorChip}>
@@ -276,9 +301,14 @@ const styles = StyleSheet.create({
   imageWrap: {
     width: '100%',
     aspectRatio: 0.98,
-    borderRadius: 26,
+    borderRadius: 30,
     overflow: 'hidden',
     backgroundColor: '#E7E3DF',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
   genderBadge: {
     position: 'absolute',
@@ -296,24 +326,27 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 14,
     top: 14,
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    backgroundColor: 'rgba(0,0,0,0.30)',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   // Tiêu đề
   brand: {
-    marginTop: 22,
-    fontSize: 14,
-    color: '#77716A',
+    marginTop: 24,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: '#9A8F82',
   },
   name: {
-    marginTop: 6,
-    fontSize: 27,
-    lineHeight: 34,
+    marginTop: 8,
+    fontSize: 28,
+    lineHeight: 35,
     fontWeight: '800',
     letterSpacing: -0.8,
     color: '#0D0D0D',
@@ -332,12 +365,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginTop: 18,
-    gap: 10,
+    marginTop: 16,
+    columnGap: 10,
+    rowGap: 8,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    gap: 8,
   },
   price: {
-    fontSize: 25,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
     color: '#1A1A1A',
   },
   originalPrice: {
@@ -346,9 +387,9 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   discountPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
     backgroundColor: '#FBE3E1',
   },
   discountText: {
@@ -358,17 +399,42 @@ const styles = StyleSheet.create({
   },
 
   // Thuộc tính
+  sectionTitle: {
+    marginTop: 28,
+    marginBottom: 12,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    color: '#0D0D0D',
+  },
   infoCard: {
-    marginTop: 24,
     backgroundColor: '#FFFFFF',
-    borderRadius: 26,
+    borderRadius: 24,
     paddingHorizontal: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  infoLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  infoIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F3F1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E4DFDA',
     gap: 12,
@@ -381,8 +447,10 @@ const styles = StyleSheet.create({
     color: '#77716A',
   },
   infoValue: {
+    flexShrink: 1,
+    textAlign: 'right',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1A1A1A',
   },
   genderValue: {
@@ -399,7 +467,7 @@ const styles = StyleSheet.create({
   },
   colorChip: {
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: '#F3F1F1',
   },
@@ -416,12 +484,17 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 14,
     flexDirection: 'row',
-    gap: 10,
-    backgroundColor: '#F3F1F1',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E4DFDA',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 12,
   },
   favoriteButton: {
     width: BAR_HEIGHT - 8,
@@ -457,9 +530,9 @@ const styles = StyleSheet.create({
 
   // Nhãn tồn kho cạnh giá
   stockPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
     backgroundColor: '#FFF1D6',
   },
   stockPillOut: {
