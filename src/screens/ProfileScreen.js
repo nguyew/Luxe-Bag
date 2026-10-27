@@ -335,6 +335,39 @@ export default function ProfileScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={18} color="#9A948D" />
         </Pressable>
 
+        {/* Đơn hàng & các túi đã mua */}
+        <Pressable
+          onPress={() => navigation.navigate('Orders')}
+          style={[styles.card, styles.favoritesRow]}
+          accessibilityRole="button"
+          accessibilityLabel="My orders"
+        >
+          <View style={[styles.favoritesIcon, styles.menuIcon]}>
+            <Ionicons name="receipt-outline" size={18} color="#1A1A1A" />
+          </View>
+          <View style={styles.favoritesText}>
+            <Text style={styles.favoritesTitle}>My orders</Text>
+            <Text style={styles.favoritesCount}>Track, cancel or return an order</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9A948D" />
+        </Pressable>
+
+        <Pressable
+          onPress={() => navigation.navigate('PurchasedBags')}
+          style={[styles.card, styles.favoritesRow]}
+          accessibilityRole="button"
+          accessibilityLabel="Purchased bags"
+        >
+          <View style={[styles.favoritesIcon, styles.menuIcon]}>
+            <Ionicons name="bag-check-outline" size={18} color="#1A1A1A" />
+          </View>
+          <View style={styles.favoritesText}>
+            <Text style={styles.favoritesTitle}>Purchased bags</Text>
+            <Text style={styles.favoritesCount}>Bags you have received</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9A948D" />
+        </Pressable>
+
         <Pressable
           onPress={confirmLogout}
           style={styles.logoutButton}
@@ -459,6 +492,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDE9EB',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  menuIcon: {
+    backgroundColor: '#EFEBE7',
   },
   favoritesText: {
     flex: 1,

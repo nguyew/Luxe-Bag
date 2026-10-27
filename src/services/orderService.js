@@ -112,6 +112,27 @@ export async function getMyOrders(_userId) {
   }
 }
 
+/**
+ * Bags the customer has purchased successfully (from delivered orders), grouped
+ * per product. Resolves to { bags, summary: { bags, items, totalSpent } }.
+ */
+export async function getPurchasedBags() {
+  try {
+    const response = await backendApi.get('api/orders/purchased');
+    if (!Array.isArray(response?.bags)) throw new Error('Unexpected response from the server.');
+    return {
+      bags: response.bags,
+      summary: {
+        bags: Number(response.summary?.bags) || response.bags.length,
+        items: Number(response.summary?.items) || 0,
+        totalSpent: Number(response.summary?.totalSpent) || 0,
+      },
+    };
+  } catch (error) {
+    throw toOrderError(error);
+  }
+}
+
 /** Cancel a pending order. Backend performs the status check and restocks items. */
 export async function cancelOrder(_userId, orderId) {
   try {

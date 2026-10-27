@@ -46,6 +46,7 @@ Administrators can manage customer accounts with a JWT for an admin user:
 Administrators can manage handbag products:
 
 - `GET /api/products` — list published products
+- `GET /api/orders/purchased` — bags the signed-in customer has purchased successfully (from delivered orders)
 - `GET /api/admin/products` — list all products
 - `POST /api/admin/products` — create a product
 - `GET /api/admin/products/:id` — view a product
