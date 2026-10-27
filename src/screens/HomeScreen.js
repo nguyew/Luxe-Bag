@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import HandbagCard from '../components/HandbagCard';
 import useFavorites from '../hooks/useFavorites';
@@ -365,7 +366,7 @@ export default function HomeScreen({ navigation }) {
                     : 'chevron-down'
                 }
                 size={14}
-                color={sortTab === 'price' ? '#FFFFFF' : '#4A4540'}
+                color={sortTab === 'price' ? '#FFFFFF' : '#6B655E'}
                 style={styles.tabIcon}
               />
             </Pressable>
@@ -391,7 +392,7 @@ export default function HomeScreen({ navigation }) {
               <Ionicons
                 name="chevron-down"
                 size={14}
-                color={selectedBrand !== 'All' ? '#EE4D2D' : '#4A4540'}
+                color={selectedBrand !== 'All' ? '#0D0D0D' : '#6B655E'}
                 style={styles.tabIcon}
               />
             </Pressable>
@@ -409,7 +410,7 @@ export default function HomeScreen({ navigation }) {
                   <Text style={styles.activeFilterChipText}>
                     {genderFilter === 'women' ? 'Women' : 'Men'}
                   </Text>
-                  <Ionicons name="close-circle" size={14} color="#EE4D2D" />
+                  <Ionicons name="close-circle" size={14} color="#0D0D0D" />
                 </Pressable>
               )}
               {selectedBrand !== 'All' && (
@@ -420,7 +421,7 @@ export default function HomeScreen({ navigation }) {
                   <Text style={styles.activeFilterChipText}>
                     {formatBrand(selectedBrand)}
                   </Text>
-                  <Ionicons name="close-circle" size={14} color="#EE4D2D" />
+                  <Ionicons name="close-circle" size={14} color="#0D0D0D" />
                 </Pressable>
               )}
               <Text style={styles.activeFilterCount}>
@@ -484,7 +485,7 @@ export default function HomeScreen({ navigation }) {
                             : 'ellipse-outline'
                         }
                         size={18}
-                        color={isSelected ? '#EE4D2D' : '#B5AEA8'}
+                        color={isSelected ? '#0D0D0D' : '#B5AEA8'}
                       />
                       <Text
                         style={[
@@ -542,7 +543,14 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F3F1F1" />
+      <StatusBar barStyle="dark-content" backgroundColor="#E6E8EB" />
+
+      {/* Nền gradient xám xanh nhạt ở đầu trang, mờ dần về nền chính */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['#E6E8EB', '#F3F1F1']}
+        style={styles.topGradient}
+      />
 
       <FlatList
         data={loading ? [] : rows}
@@ -574,6 +582,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F1F1',
   },
 
+  topGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 340,
+  },
+
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 110, // chừa chỗ cho tab bar nổi
@@ -584,13 +600,14 @@ const styles = StyleSheet.create({
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
+    justifyContent: 'space-between',
   },
 
   headerButton: {
-    width: 32,
-    height: 38,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.75)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -614,22 +631,22 @@ const styles = StyleSheet.create({
 
   // Hero
   hero: {
-    paddingTop: 22,
-    paddingBottom: 22,
+    paddingTop: 18,
+    paddingBottom: 20,
   },
 
   heroTitle: {
-    fontSize: 28,
-    lineHeight: 34,
-    letterSpacing: -0.9,
+    fontSize: 30,
+    lineHeight: 37,
+    letterSpacing: -1,
     color: '#1A1A1A',
     fontWeight: '400',
   },
 
   heroBold: {
-    fontSize: 28,
-    lineHeight: 34,
-    letterSpacing: -0.9,
+    fontSize: 30,
+    lineHeight: 37,
+    letterSpacing: -1,
     color: '#0D0D0D',
     fontWeight: '800',
   },
@@ -641,33 +658,25 @@ const styles = StyleSheet.create({
   filterTabsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
     paddingVertical: 4,
   },
   sortTab: {
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 19,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1,
   },
   sortTabActive: {
-    backgroundColor: '#EE4D2D',
-    borderColor: '#EE4D2D',
+    backgroundColor: '#0D0D0D',
   },
   sortTabText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#333333',
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6B655E',
   },
   sortTabTextActive: {
     color: '#FFFFFF',
@@ -682,11 +691,12 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   sortTabBrandActive: {
-    backgroundColor: '#FFF5F2',
-    borderColor: '#EE4D2D',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0D0D0D',
   },
   sortTabTextBrandActive: {
-    color: '#EE4D2D',
+    color: '#0D0D0D',
     fontWeight: '700',
   },
 
@@ -707,17 +717,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#FFEBE6',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#FFD2C8',
+    borderColor: '#E4DFDA',
   },
   activeFilterChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#EE4D2D',
+    color: '#0D0D0D',
   },
   activeFilterCount: {
     fontSize: 12,
@@ -736,8 +746,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxHeight: '75%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 28,
+    padding: 22,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
@@ -779,12 +789,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     marginBottom: 6,
   },
   brandItemSelected: {
-    backgroundColor: '#FFF5F2',
+    backgroundColor: '#F3F1F1',
   },
   brandItemLeft: {
     flexDirection: 'row',
@@ -797,7 +807,7 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
   brandItemTextSelected: {
-    color: '#EE4D2D',
+    color: '#0D0D0D',
     fontWeight: '700',
   },
   brandCountBadge: {
@@ -816,11 +826,11 @@ const styles = StyleSheet.create({
 
   productRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: 14,
+    marginBottom: 14,
   },
   rowWide: {
-    marginBottom: 12,
+    marginBottom: 14,
   },
 
   productColumn: {

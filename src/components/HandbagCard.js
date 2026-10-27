@@ -39,7 +39,7 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
       {/* Lớp phủ tối dần ở đáy để chữ trắng luôn đọc được trên ảnh sáng */}
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.62)']}
+        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.68)']}
         locations={[0, 1]}
         style={styles.bottomScrim}
       />
@@ -110,14 +110,12 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
         </View>
 
         <View style={[styles.captionRight, !wide && styles.captionRightRow]}>
-          {!!formatOriginalPrice(item) && (
-            <Text style={{ textDecorationLine: 'line-through', color: '#8A837B', marginRight: 6 }}>
-              {formatOriginalPrice(item)}
-            </Text>
-          )}
           <Text style={styles.productCaptionPrice}>
             {formatPrice(item.cost)}
           </Text>
+          {!!formatOriginalPrice(item) && (
+            <Text style={styles.originalPrice}>{formatOriginalPrice(item)}</Text>
+          )}
           {!!formatPercentOff(item.percentOff) && (
             <View style={[styles.discountPill, !wide && styles.discountPillRow]}>
               <Text style={styles.discountText}>
@@ -134,7 +132,7 @@ function HandbagCard({ item, wide, onOpen, isFavorite, onFavorite }) {
 const styles = StyleSheet.create({
   productCard: {
     overflow: 'hidden',
-    borderRadius: 26,
+    borderRadius: 30,
     position: 'relative',
   },
 
@@ -187,6 +185,12 @@ const styles = StyleSheet.create({
   captionRight: {
     alignItems: 'flex-end',
   },
+  originalPrice: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
+    textDecorationLine: 'line-through',
+    marginTop: 2,
+  },
   // Thẻ đứng: xếp dọc để tên có đủ bề ngang cho 2 dòng
   captionStacked: {
     flexDirection: 'column',
@@ -200,8 +204,11 @@ const styles = StyleSheet.create({
   },
   captionRightRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    columnGap: 8,
+    rowGap: 4,
   },
 
   productCaptionBrand: {
@@ -214,8 +221,8 @@ const styles = StyleSheet.create({
   },
 
   productCaptionName: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 17,
     color: '#FFFFFF',
     fontWeight: '600',
     textShadowColor: 'rgba(0,0,0,0.25)',
@@ -224,9 +231,9 @@ const styles = StyleSheet.create({
   },
 
   productCaptionPrice: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
     textShadowColor: 'rgba(0,0,0,0.25)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
