@@ -105,7 +105,29 @@ async function reset(User, Review) {
   console.log(`Removed ${reviews.deletedCount} sample reviews and ${users.deletedCount} sample reviewers.`);
 }
 
+/**
+ * `scripts/seed-mongodb.js` used an older Review schema (user/product/order) and left a
+ * unique index `user_1_product_1_order_1` plus one legacy document in `reviews`.
+ * The Express Backend does not use either, and the index makes every new review collide
+ * on { user: null, product: null, order: null }. Remove both.
+ */
+async function removeLegacyReviewData(Review) {
+  const indexes = await Review.collection.indexes();
+  for (const index of indexes) {
+    const keys = Object.keys(index.key || {});
+    if (keys.includes('user') || keys.includes('product') || keys.includes('order')) {
+      await Review.collection.dropIndex(index.name);
+      console.log(`Dropped legacy index: ${index.name}`);
+    }
+  }
+  const legacy = await Review.collection.deleteMany({ productId: { $exists: false } });
+  if (legacy.deletedCount) console.log(`Removed ${legacy.deletedCount} legacy review document(s).`);
+  await Review.init(); // make sure the real indexes (productId + userId) exist
+}
+
 async function seed(User, Product, Review) {
+  await removeLegacyReviewData(Review);
+
   const products = await Product.find({ status: 'published' }).select('_id handbagName');
   if (!products.length) {
     console.error('No published products found. Add/publish products first (e.g. npm run seed).');

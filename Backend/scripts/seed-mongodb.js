@@ -203,7 +203,6 @@ const schemas = {
 };
 
 schemas.Favorite.index({ user: 1, product: 1 }, { unique: true });
-schemas.Review.index({ user: 1, product: 1, order: 1 }, { unique: true });
 schemas.Product.index({ name: 'text', description: 'text', tags: 'text' });
 schemas.Order.index({ user: 1, createdAt: -1 });
 
@@ -345,7 +344,6 @@ async function seed() {
     },
   ]);
   await upsert(models.Payment, [{ _id: new mongoose.Types.ObjectId('670000000000000000000901'), order: ids.order, amount: 8900000, method: 'card', status: 'paid', transactionId: 'SEED-TXN-0001', paidAt: now }]);
-  await upsert(models.Review, [{ _id: ids.review, product: ids.productTabby, user: ids.customer, order: ids.order, rating: 5, title: 'Đẹp và chắc chắn', content: 'Sản phẩm đúng mô tả, đóng gói cẩn thận.', status: 'approved', moderatedAt: now }]);
   await upsert(models.Promotion, [{ _id: ids.promotion, code: 'WELCOME10', name: 'Welcome discount', type: 'percentage', value: 10, minOrderValue: 1000000, startsAt: now, endsAt: new Date('2027-12-31T23:59:59.000Z'), usageLimit: 1000, isActive: true }]);
   await upsert(models.ReturnRequest, [{ _id: new mongoose.Types.ObjectId('670000000000000000001001'), order: ids.order, user: ids.customer, reason: 'Đổi sang màu khác', status: 'requested', refundAmount: 8900000 }]);
 
