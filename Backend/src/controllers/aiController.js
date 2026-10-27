@@ -1,9 +1,15 @@
-const { geminiApiKey, geminiModel } = require('../config/env');
+const { geminiApiKey, geminiModel, geminiFallbackModels } = require('../config/env');
 
 const MAX_REQUEST_LENGTH = 300;
 const MAX_CATALOG_ITEMS = 60;
 const MAX_PICKS = 3;
-const TIMEOUT_MS = 30000;
+const TOTAL_BUDGET_MS = 26000; // must stay below the app's 30s client timeout
+const ATTEMPT_TIMEOUT_MS = 12000;
+const RETRY_DELAY_MS = 700;
+const MODELS = [...new Set([geminiModel, ...geminiFallbackModels])];
+const RETRYABLE_STATUS = new Set([500, 502, 503, 504]);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const RESPONSE_SCHEMA = {
   type: 'object',
@@ -87,40 +93,77 @@ async function askStylist(req, res) {
     'Customer request:', `"""${request}"""`,
   ].join('\n');
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
-      body: JSON.stringify({
-        model: geminiModel,
-        input: prompt,
-        response_format: { type: 'text', mime_type: 'application/json', schema: RESPONSE_SCHEMA },
-      }),
-      signal: controller.signal,
-    });
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  let lastFailure = { status: 502, body: { error: 'Could not reach Gemini.', code: 'network' } };
 
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        return res.status(502).json({ error: 'Gemini rejected the server API key.', code: 'auth' });
+  // Calls one model once. Returns { text } on success or { failure, retry, next }.
+  const callModel = async (model) => {
+    const remaining = deadline - Date.now();
+    if (remaining < 1500) return { failure: lastFailure, retry: false, next: false, stop: true };
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.min(ATTEMPT_TIMEOUT_MS, remaining));
+    try {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
+        body: JSON.stringify({
+          model,
+          input: prompt,
+          response_format: { type: 'text', mime_type: 'application/json', schema: RESPONSE_SCHEMA },
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        console.error(`Gemini API error ${response.status} (${model}):`, detail.slice(0, 500));
+        const { status } = response;
+        if (status === 401 || status === 403) {
+          return { failure: { status: 502, body: { error: 'Gemini rejected the server API key.', code: 'auth' } }, stop: true };
+        }
+        if (status === 429) {
+          return { failure: { status: 429, body: { error: 'Gemini request limit reached.', code: 'quota' } }, next: true };
+        }
+        if (RETRYABLE_STATUS.has(status)) {
+          return { failure: { status: 502, body: { error: 'Gemini service is temporarily unavailable.', code: 'server' } }, retry: true, next: true };
+        }
+        // 400/404: bad request or unknown model -> try the next model
+        return { failure: { status: 502, body: { error: 'Gemini could not process the request.', code: 'bad_request' } }, next: true };
       }
-      if (response.status === 429) return res.status(429).json({ error: 'Gemini request limit reached.', code: 'quota' });
-      if (response.status >= 500) return res.status(502).json({ error: 'Gemini service is temporarily unavailable.', code: 'server' });
-      return res.status(502).json({ error: 'Gemini could not process the request.', code: 'bad_request' });
-    }
 
-    const data = await response.json();
-    const outputText = extractText(data);
-    if (!outputText) return res.status(502).json({ error: 'Gemini returned an unreadable response.', code: 'invalid' });
-    return res.json({ outputText });
-  } catch (error) {
-    if (error?.name === 'AbortError') return res.status(504).json({ error: 'Gemini request timed out.', code: 'timeout' });
-    console.error('AI Stylist request failed:', error.message);
-    return res.status(502).json({ error: 'Could not reach Gemini.', code: 'network' });
-  } finally {
-    clearTimeout(timer);
+      const data = await response.json();
+      const outputText = extractText(data);
+      if (!outputText) {
+        return { failure: { status: 502, body: { error: 'Gemini returned an unreadable response.', code: 'invalid' } }, retry: true, next: true };
+      }
+      return { text: outputText };
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return { failure: { status: 504, body: { error: 'Gemini request timed out.', code: 'timeout' } }, next: true };
+      }
+      console.error(`AI Stylist request failed (${model}):`, error.message);
+      return { failure: { status: 502, body: { error: 'Could not reach Gemini.', code: 'network' } }, retry: true, next: true };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  for (const model of MODELS) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result = await callModel(model);
+      if (result.text) {
+        if (model !== MODELS[0]) console.log(`AI Stylist answered with fallback model ${model}`);
+        return res.json({ outputText: result.text });
+      }
+      lastFailure = result.failure || lastFailure;
+      if (result.stop) return res.status(lastFailure.status).json(lastFailure.body);
+      if (!result.retry || attempt === 1) break;
+      await sleep(RETRY_DELAY_MS);
+    }
   }
+
+  return res.status(lastFailure.status).json(lastFailure.body);
 }
 
 module.exports = { askStylist };
