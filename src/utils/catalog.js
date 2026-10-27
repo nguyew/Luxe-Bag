@@ -61,3 +61,14 @@ export function getStockStatus(handbag) {
   }
   return { key: 'in', label: 'In stock', icon: 'checkmark-circle' };
 }
+
+/**
+ * Số tiền được giảm so với giá gốc cho `qty` món (0 nếu không có giá gốc).
+ * Dùng để hiện "You save" ở giỏ hàng và checkout; chỉ hiển thị, không ảnh hưởng tổng tiền.
+ */
+export function lineSavings(handbag, qty = 1) {
+  const original = Number(handbag?.originalCost);
+  const current = unitPrice(handbag);
+  if (!Number.isFinite(original) || !(original > current)) return 0;
+  return (original - current) * Math.max(0, Number(qty) || 0);
+}

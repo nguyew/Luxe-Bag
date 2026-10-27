@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AddressCard from '../components/AddressCard';
+import RemoteImage from '../components/RemoteImage';
 import SignInPrompt from '../components/SignInPrompt';
 import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
@@ -24,8 +25,9 @@ import {
   describeCouponError,
   validateCoupon,
 } from '../utils/coupons';
-import { PAYMENT_METHODS, calcTotals } from '../utils/orders';
-import { formatPrice } from '../utils/format';
+import { PAYMENT_METHODS, RETURN_WINDOW_DAYS, calcTotals, paymentLabel } from '../utils/orders';
+import { lineSavings } from '../utils/catalog';
+import { formatBrand, formatColors, formatPrice } from '../utils/format';
 import { tapLight } from '../utils/haptics';
 
 const BAR_HEIGHT = 56;
@@ -54,6 +56,22 @@ export default function CheckoutScreen({ navigation }) {
   const [applied, setApplied] = useState(null); // { coupon }
   const [couponError, setCouponError] = useState('');
   const [checking, setChecking] = useState(false);
+  const [coupons, setCoupons] = useState([]); // mã đang dùng được, lấy từ API
+
+  // Tải danh sách mã giảm giá khả dụng từ Backend để gợi ý cho khách.
+  // Lỗi mạng thì bỏ qua: khách vẫn nhập mã bằng tay như trước.
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    let cancelled = false;
+    fetchPromotions()
+      .then((list) => {
+        if (!cancelled) setCoupons(list);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
 
   const addresses = user?.addresses || [];
   const address =
@@ -116,6 +134,19 @@ export default function CheckoutScreen({ navigation }) {
     }
   }, [checking, couponInput, cart.subtotal]);
 
+  const applySuggested = useCallback(
+    (code) => {
+      const result = validateCoupon(coupons, code, cart.subtotal);
+      if (result.ok) {
+        setApplied({ coupon: result.coupon });
+        setCouponError('');
+      } else {
+        setCouponError(describeCouponError(result));
+      }
+    },
+    [coupons, cart.subtotal]
+  );
+
   if (!isLoggedIn) {
     return (
       <View style={styles.screen}>
@@ -151,6 +182,15 @@ export default function CheckoutScreen({ navigation }) {
     discount
   );
 
+  // Thông tin hiển thị thêm (từ dữ liệu sản phẩm & tài khoản trả về bởi API)
+  const goodLines = cart.lines.filter((line) => !line.problem);
+  const savings = goodLines.reduce(
+    (sum, line) => sum + (line.product ? lineSavings(line.product, line.qty) : 0),
+    0
+  );
+  const contactPhone = user?.phone || address?.phone || '';
+  const suggestions = coupons.filter((coupon) => !applied || coupon.code !== applied.coupon.code);
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -179,6 +219,33 @@ export default function CheckoutScreen({ navigation }) {
             <Ionicons name="add-circle-outline" size={22} color="#1A1A1A" />
             <Text style={styles.addAddressText}>Add a delivery address</Text>
           </Pressable>
+        )}
+
+        {/* Liên hệ: thông tin tài khoản */}
+        {(!!user?.name || !!user?.email || !!contactPhone) && (
+          <>
+            <Text style={styles.section}>Contact</Text>
+            <View style={styles.contactCard}>
+              {!!user?.name && (
+                <View style={styles.contactRow}>
+                  <Ionicons name="person-outline" size={17} color="#55514C" />
+                  <Text style={styles.contactText}>{user.name}</Text>
+                </View>
+              )}
+              {!!user?.email && (
+                <View style={styles.contactRow}>
+                  <Ionicons name="mail-outline" size={17} color="#55514C" />
+                  <Text style={styles.contactText}>{user.email}</Text>
+                </View>
+              )}
+              {!!contactPhone && (
+                <View style={styles.contactRow}>
+                  <Ionicons name="call-outline" size={17} color="#55514C" />
+                  <Text style={styles.contactText}>{contactPhone}</Text>
+                </View>
+              )}
+            </View>
+          </>
         )}
 
         {/* Thanh toán */}
@@ -257,26 +324,82 @@ export default function CheckoutScreen({ navigation }) {
           </View>
         )}
         {!!couponError && <Text style={styles.couponError}>{couponError}</Text>}
+        {suggestions.length > 0 && (
+          <View style={styles.suggestWrap}>
+            <Text style={styles.suggestLabel}>Available codes</Text>
+            {suggestions.slice(0, 3).map((coupon) => (
+              <Pressable
+                key={coupon.id}
+                onPress={() => applySuggested(coupon.code)}
+                style={styles.suggestRow}
+                accessibilityRole="button"
+                accessibilityLabel={`Apply code ${coupon.code}`}
+              >
+                <Ionicons name="pricetag-outline" size={16} color="#1A1A1A" />
+                <View style={styles.suggestText}>
+                  <Text style={styles.suggestCode}>{coupon.code}</Text>
+                  <Text style={styles.suggestDesc}>{describeCoupon(coupon)}</Text>
+                </View>
+                <Text style={styles.suggestApply}>Apply</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         {/* Tóm tắt đơn */}
-        <Text style={styles.section}>Order summary</Text>
+        <Text style={styles.section}>
+          Order summary · {cart.count} {cart.count === 1 ? 'item' : 'items'}
+        </Text>
         <View style={styles.summary}>
-          {cart.lines.map((line) => (
-            <View key={line.id} style={styles.lineRow}>
-              <Text style={[styles.lineName, !!line.problem && styles.lineBad]} numberOfLines={2}>
-                {line.qty} × {line.product?.handbagName || 'Unavailable item'}
-              </Text>
-              <Text style={[styles.lineValue, !!line.problem && styles.lineBad]}>
-                {formatPrice(line.lineTotal)}
-              </Text>
-            </View>
-          ))}
+          {cart.lines.map((line) => {
+            const product = line.product;
+            const meta = formatColors(product?.color);
+            const originalTotal =
+              Number(product?.originalCost) > Number(product?.cost)
+                ? Number(product.originalCost) * line.qty
+                : 0;
+            return (
+              <View key={line.id} style={styles.itemRow}>
+                <View style={styles.itemThumb}>
+                  <RemoteImage uri={product?.uri} style={StyleSheet.absoluteFill} iconSize={20} />
+                </View>
+                <View style={styles.itemBody}>
+                  {!!product?.brand && (
+                    <Text style={styles.itemBrand} numberOfLines={1}>
+                      {formatBrand(product.brand)}
+                    </Text>
+                  )}
+                  <Text style={[styles.itemName, !!line.problem && styles.lineBad]} numberOfLines={2}>
+                    {product?.handbagName || 'Unavailable item'}
+                  </Text>
+                  {!!meta && <Text style={styles.itemMeta}>{meta}</Text>}
+                  <Text style={styles.itemMeta}>
+                    {line.qty} × {formatPrice(line.unitPrice)}
+                  </Text>
+                </View>
+                <View style={styles.itemPriceCol}>
+                  {!!originalTotal && (
+                    <Text style={styles.itemOriginal}>{formatPrice(originalTotal)}</Text>
+                  )}
+                  <Text style={[styles.lineValue, !!line.problem && styles.lineBad]}>
+                    {formatPrice(line.lineTotal)}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
 
           <View style={styles.divider} />
           <View style={styles.lineRow}>
             <Text style={styles.rowLabel}>Subtotal</Text>
             <Text style={styles.lineValue}>{formatPrice(totals.subtotal)}</Text>
           </View>
+          {savings > 0 && (
+            <View style={styles.lineRow}>
+              <Text style={styles.rowLabel}>Product savings</Text>
+              <Text style={[styles.lineValue, styles.discountText]}>-{formatPrice(savings)}</Text>
+            </View>
+          )}
           {totals.discount > 0 && (
             <View style={styles.lineRow}>
               <Text style={styles.rowLabel}>Discount ({applied.coupon.code})</Text>
@@ -285,7 +408,7 @@ export default function CheckoutScreen({ navigation }) {
           )}
           <View style={styles.lineRow}>
             <Text style={styles.rowLabel}>Shipping</Text>
-            <Text style={styles.lineValue}>
+            <Text style={[styles.lineValue, totals.shipping === 0 && styles.discountText]}>
               {totals.shipping === 0 ? 'Free' : formatPrice(totals.shipping)}
             </Text>
           </View>
@@ -293,6 +416,28 @@ export default function CheckoutScreen({ navigation }) {
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>{formatPrice(totals.total)}</Text>
           </View>
+
+          <View style={styles.divider} />
+          <View style={styles.lineRow}>
+            <Text style={styles.rowLabel}>Payment</Text>
+            <Text style={styles.lineValue}>{paymentLabel(method)}</Text>
+          </View>
+          {!!address && (
+            <View style={styles.lineRow}>
+              <Text style={styles.rowLabel}>Ship to</Text>
+              <Text style={[styles.lineValue, styles.shipToValue]} numberOfLines={2}>
+                {address.fullName} · {address.city}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.policyRow}>
+          <Ionicons name="shield-checkmark-outline" size={16} color="#55514C" />
+          <Text style={styles.policyText}>
+            Easy returns within {RETURN_WINDOW_DAYS} days of delivery. You can track this order
+            from your account after placing it.
+          </Text>
         </View>
 
         {!!error && (
@@ -374,6 +519,47 @@ export default function CheckoutScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   discountText: { color: '#1F7A3E' },
+  contactCard: { padding: 16, gap: 10, marginBottom: 12, borderRadius: 22, backgroundColor: '#FFFFFF' },
+  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  contactText: { flex: 1, fontSize: 14, color: '#1A1A1A' },
+  suggestWrap: { marginTop: 12, gap: 8 },
+  suggestLabel: { marginLeft: 4, fontSize: 12, fontWeight: '700', color: '#77716A' },
+  suggestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+  },
+  suggestText: { flex: 1 },
+  suggestCode: { fontSize: 13, fontWeight: '800', letterSpacing: 0.5, color: '#1A1A1A' },
+  suggestDesc: { marginTop: 1, fontSize: 12, color: '#77716A' },
+  suggestApply: { fontSize: 13, fontWeight: '700', color: '#1A1A1A', textDecorationLine: 'underline' },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  itemThumb: {
+    width: 54,
+    height: 66,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#E7E3DF',
+  },
+  itemBody: { flex: 1, minWidth: 0 },
+  itemBrand: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: '#77716A',
+  },
+  itemName: { marginTop: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: '#1A1A1A' },
+  itemMeta: { marginTop: 2, fontSize: 12, color: '#8A837B' },
+  itemPriceCol: { alignItems: 'flex-end' },
+  itemOriginal: { fontSize: 11, color: '#8A837B', textDecorationLine: 'line-through' },
+  shipToValue: { flex: 1, textAlign: 'right' },
+  policyRow: { flexDirection: 'row', gap: 8, marginTop: 14, paddingHorizontal: 6 },
+  policyText: { flex: 1, fontSize: 12, lineHeight: 17, color: '#77716A' },
   couponRow: { flexDirection: 'row', gap: 10 },
   couponInput: {
     flex: 1,

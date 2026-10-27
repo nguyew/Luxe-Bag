@@ -23,7 +23,7 @@ import {
   isGeminiConfigured,
 } from '../services/geminiService';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
-import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
+import { formatOriginalPrice, formatPercentOff, formatPrice, formatBrand } from '../utils/format';
 
 const SUGGESTIONS = [
   'A work bag under $600',
@@ -57,7 +57,7 @@ const PickCard = React.memo(function PickCard({ pick, favorite, onOpen, onToggle
 
       <View style={styles.pickInfo}>
         <Text style={styles.pickBrand} numberOfLines={1}>
-          {handbag.brand}
+          {formatBrand(handbag.brand)}
         </Text>
         <Text style={styles.pickName} numberOfLines={2}>
           {handbag.handbagName}

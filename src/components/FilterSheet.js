@@ -18,6 +18,7 @@ import {
   applyFilters,
   facetOptions,
 } from '../utils/filters';
+import { formatBrand, formatCategory } from '../utils/format';
 
 function Chip({ label, on, onPress }) {
   return (
@@ -113,7 +114,7 @@ export default function FilterSheet({ visible, items, filters, onApply, onClose 
                   {categories.map((option) => (
                     <Chip
                       key={option.value}
-                      label={`${option.value} (${option.count})`}
+                      label={`${formatCategory(option.value)} (${option.count})`}
                       on={draft.categories.includes(option.value)}
                       onPress={() => set({ categories: toggle(draft.categories, option.value) })}
                     />
@@ -129,7 +130,7 @@ export default function FilterSheet({ visible, items, filters, onApply, onClose 
                   {brands.map((option) => (
                     <Chip
                       key={option.value}
-                      label={`${option.value} (${option.count})`}
+                      label={`${formatBrand(option.value)} (${option.count})`}
                       on={draft.brands.includes(option.value)}
                       onPress={() => set({ brands: toggle(draft.brands, option.value) })}
                     />
@@ -138,7 +139,7 @@ export default function FilterSheet({ visible, items, filters, onApply, onClose 
               </>
             )}
 
-            <Text style={styles.section}>Price range ($)</Text>
+            <Text style={styles.section}>Price range (₫)</Text>
             <View style={styles.priceRow}>
               <TextInput
                 value={draft.minPrice}

@@ -16,7 +16,7 @@ import RemoteImage from '../components/RemoteImage';
 import useAuth from '../hooks/useAuth';
 import useHandbags from '../hooks/useHandbags';
 import { cancelOrder, describeOrderError, getMyOrders } from '../services/orderService';
-import { formatPrice } from '../utils/format';
+import { formatPrice, formatBrand } from '../utils/format';
 import {
   RETURN_STATUS,
   canCancel,
@@ -137,7 +137,7 @@ export default function OrderDetailScreen({ navigation, route }) {
               <RemoteImage uri={item.uri} style={styles.thumbImage} />
             </View>
             <View style={styles.itemBody}>
-              {!!item.brand && <Text style={styles.brand}>{item.brand}</Text>}
+              {!!item.brand && <Text style={styles.brand}>{formatBrand(item.brand)}</Text>}
               <Text style={styles.itemName} numberOfLines={2}>
                 {item.name}
               </Text>

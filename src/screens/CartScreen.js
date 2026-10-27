@@ -15,14 +15,15 @@ import CartItem from '../components/CartItem';
 import SignInPrompt from '../components/SignInPrompt';
 import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
-import { FREE_SHIPPING_THRESHOLD } from '../utils/orders';
+import { FREE_SHIPPING_THRESHOLD, RETURN_WINDOW_DAYS } from '../utils/orders';
+import { lineSavings } from '../utils/catalog';
 import { formatPrice } from '../utils/format';
 import { tapSelect } from '../utils/haptics';
 
 const TAB_BAR_SPACE = 110; // chừa chỗ cho tab bar nổi
 
 export default function CartScreen({ navigation }) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const cart = useCart();
   const { setQty, remove } = cart; // hàm ổn định -> CartItem (memo) không vẽ lại thừa
 
@@ -107,6 +108,13 @@ export default function CartScreen({ navigation }) {
 
   const toFreeShipping = FREE_SHIPPING_THRESHOLD - cart.subtotal;
 
+  // Thông tin hiển thị thêm, lấy từ dữ liệu sản phẩm và tài khoản (API)
+  const savings = cart.lines
+    .filter((line) => !line.problem && line.product)
+    .reduce((sum, line) => sum + lineSavings(line.product, line.qty), 0);
+  const addresses = user?.addresses || [];
+  const shipTo = addresses.find((item) => item.isDefault) || addresses[0] || null;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F3F1F1" />
@@ -145,12 +153,20 @@ export default function CartScreen({ navigation }) {
             )}
 
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Subtotal</Text>
+              <Text style={styles.rowLabel}>
+                Subtotal ({cart.count} {cart.count === 1 ? 'item' : 'items'})
+              </Text>
               <Text style={styles.rowValue}>{formatPrice(cart.subtotal)}</Text>
             </View>
+            {savings > 0 && (
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>You save</Text>
+                <Text style={[styles.rowValue, styles.saveValue]}>-{formatPrice(savings)}</Text>
+              </View>
+            )}
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Shipping</Text>
-              <Text style={styles.rowValue}>
+              <Text style={[styles.rowValue, cart.shipping === 0 && styles.saveValue]}>
                 {cart.shipping === 0 ? 'Free' : formatPrice(cart.shipping)}
               </Text>
             </View>
@@ -164,6 +180,24 @@ export default function CartScreen({ navigation }) {
             <View style={styles.row}>
               <Text style={styles.totalLabel}>Total</Text>
               <Text style={styles.totalValue}>{formatPrice(cart.total)}</Text>
+            </View>
+
+            {/* Thông tin giao hàng & chính sách */}
+            <View style={styles.infoBlock}>
+              {!!shipTo && (
+                <View style={styles.infoLine}>
+                  <Ionicons name="location-outline" size={16} color="#55514C" />
+                  <Text style={styles.infoText} numberOfLines={2}>
+                    Deliver to {shipTo.fullName} · {shipTo.city}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.infoLine}>
+                <Ionicons name="return-down-back-outline" size={16} color="#55514C" />
+                <Text style={styles.infoText}>
+                  Easy returns within {RETURN_WINDOW_DAYS} days of delivery
+                </Text>
+              </View>
             </View>
 
             <Pressable
@@ -225,6 +259,10 @@ const styles = StyleSheet.create({
   },
   rowLabel: { fontSize: 14, color: '#77716A' },
   rowValue: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
+  saveValue: { color: '#1F7A3E' },
+  infoBlock: { marginTop: 14, gap: 8, padding: 12, borderRadius: 16, backgroundColor: '#F3F1F1' },
+  infoLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoText: { flex: 1, fontSize: 12, lineHeight: 17, color: '#55514C' },
   hint: { marginBottom: 4, fontSize: 12, color: '#8A5A00' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 10, backgroundColor: '#D8D2CC' },
   totalLabel: { fontSize: 16, fontWeight: '700', color: '#0D0D0D' },
@@ -240,7 +278,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkout: { marginTop: 16, alignSelf: 'stretch' },
+  checkout: { marginTop: 14, alignSelf: 'stretch' },
   disabled: { backgroundColor: '#B9B2AA' },
   primaryText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

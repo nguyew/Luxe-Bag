@@ -10,7 +10,7 @@ import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import useFavorites from '../hooks/useFavorites';
 import { useHandbag } from '../hooks/useHandbags';
-import { formatBrand, formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
+import { formatBrand, formatCategory, formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
 import { getStockStatus, isPurchasable } from '../utils/catalog';
 import { tapLight } from '../utils/haptics';
@@ -25,9 +25,6 @@ const STOCK_TONES = {
 };
 
 
-// Hide raw database IDs (for example, 670000000000000000000101) from customer-facing UI.
-const isDatabaseId = (value) =>
-  typeof value === 'string' && /^[a-f0-9]{24}$/i.test(value.trim());
 
 export default function DetailScreen({ route, navigation }) {
   // Dữ liệu truyền qua route hiện ngay; bản mới nhất trong kho (ví dụ feedback
@@ -195,7 +192,7 @@ export default function DetailScreen({ route, navigation }) {
                 </View>
                 <Text style={styles.infoLabel}>Category</Text>
               </View>
-              <Text style={styles.infoValue}>{isDatabaseId(handbag.category) ? 'Uncategorized' : handbag.category}</Text>
+              <Text style={styles.infoValue}>{formatCategory(handbag.category)}</Text>
             </View>
           )}
 

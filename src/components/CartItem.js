@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import RemoteImage from './RemoteImage';
-import { formatPrice } from '../utils/format';
+import { formatBrand, formatCategory, formatColors, formatPrice } from '../utils/format';
 
 /**
  * Một dòng trong giỏ hàng.
@@ -12,6 +12,15 @@ function CartItem({ line, onOpen, onIncrease, onDecrease, onRemove }) {
   const { product, qty, maxQty, problem } = line;
   const name = product?.handbagName || 'Item no longer available';
   const unavailable = problem === 'unavailable';
+
+  // Thông tin phụ lấy từ dữ liệu sản phẩm của API: danh mục · màu sắc
+  const meta = [formatCategory(product?.category), formatColors(product?.color)]
+    .filter(Boolean)
+    .join(' · ');
+  const originalTotal =
+    Number(product?.originalCost) > Number(product?.cost)
+      ? Number(product.originalCost) * qty
+      : 0;
 
   return (
     <View style={styles.card}>
@@ -30,12 +39,17 @@ function CartItem({ line, onOpen, onIncrease, onDecrease, onRemove }) {
           <View style={styles.titleWrap}>
             {!!product?.brand && (
               <Text style={styles.brand} numberOfLines={1}>
-                {product.brand}
+                {formatBrand(product.brand)}
               </Text>
             )}
             <Text style={styles.name} numberOfLines={2}>
               {name}
             </Text>
+            {!!meta && (
+              <Text style={styles.meta} numberOfLines={1}>
+                {meta}
+              </Text>
+            )}
           </View>
 
           <Pressable
@@ -86,9 +100,14 @@ function CartItem({ line, onOpen, onIncrease, onDecrease, onRemove }) {
             <View />
           )}
 
-          <Text style={[styles.price, unavailable && styles.priceDim]}>
-            {formatPrice(line.lineTotal)}
-          </Text>
+          <View style={styles.priceCol}>
+            {!!originalTotal && !unavailable && (
+              <Text style={styles.originalPrice}>{formatPrice(originalTotal)}</Text>
+            )}
+            <Text style={[styles.price, unavailable && styles.priceDim]}>
+              {formatPrice(line.lineTotal)}
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -126,6 +145,9 @@ const styles = StyleSheet.create({
     color: '#77716A',
   },
   name: { marginTop: 2, fontSize: 14, lineHeight: 19, fontWeight: '600', color: '#1A1A1A' },
+  meta: { marginTop: 2, fontSize: 12, color: '#8A837B' },
+  priceCol: { alignItems: 'flex-end' },
+  originalPrice: { fontSize: 11, color: '#8A837B', textDecorationLine: 'line-through' },
   problem: { marginTop: 4, fontSize: 12, fontWeight: '600', color: '#B3261E' },
   bottomRow: {
     flexDirection: 'row',

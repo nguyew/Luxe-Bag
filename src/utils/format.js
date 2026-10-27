@@ -39,5 +39,15 @@ export const formatBrand = (val) => {
 export const formatCategory = (val) => {
   if (!val) return '';
   const str = String(val).trim();
-  return KNOWN_LABELS[str] || str;
+  if (KNOWN_LABELS[str]) return KNOWN_LABELS[str];
+  return isDatabaseId(str) ? 'Uncategorized' : str;
+};
+
+/** ["Black", "Ivory"] -> "Black, Ivory" (chấp nhận mảng hoặc chuỗi). */
+export const formatColors = (val) => {
+  const list = Array.isArray(val) ? val : val ? [val] : [];
+  return list
+    .map((name) => String(name).trim())
+    .filter(Boolean)
+    .join(', ');
 };

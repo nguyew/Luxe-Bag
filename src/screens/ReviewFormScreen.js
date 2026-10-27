@@ -22,6 +22,7 @@ import {
   describeReviewError,
   submitReview,
 } from '../services/reviewService';
+import { formatBrand } from '../utils/format';
 
 const RATING_WORDS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
 
@@ -103,7 +104,7 @@ export default function ReviewFormScreen({ navigation, route }) {
             <RemoteImage uri={handbag.uri} style={styles.thumbImage} />
           </View>
           <View style={styles.productText}>
-            {!!handbag.brand && <Text style={styles.brand}>{handbag.brand}</Text>}
+            {!!handbag.brand && <Text style={styles.brand}>{formatBrand(handbag.brand)}</Text>}
             <Text style={styles.name} numberOfLines={2}>
               {handbag.handbagName}
             </Text>
