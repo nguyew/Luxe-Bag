@@ -1,1 +1,0 @@
-module.exports = { impactAsync: async () => {}, selectionAsync: async () => {}, notificationAsync: async () => {}, ImpactFeedbackStyle: { Light: 'l', Medium: 'm' }, NotificationFeedbackType: { Success: 's', Error: 'e' } };

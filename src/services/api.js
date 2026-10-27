@@ -1,9 +1,6 @@
 /**
  * API clients for LuxeBag.
  *
- * MockAPI (legacy resources such as handbags/users):
- *   EXPO_PUBLIC_API_URL=https://your-project.mockapi.io/handbags
- *
  * LuxeBag Backend (Express API):
  *   EXPO_PUBLIC_BACKEND_URL=http://YOUR_COMPUTER_LAN_IP:5000
  *
@@ -14,13 +11,7 @@
 
 const trimBaseUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 
-export const MOCK_API_URL = trimBaseUrl(process.env.EXPO_PUBLIC_API_URL)
-  .replace(/\/handbags$/i, '');
-
 export const BACKEND_URL = trimBaseUrl(process.env.EXPO_PUBLIC_BACKEND_URL);
-
-// Backwards compatibility for existing imports that use BASE_URL for MockAPI.
-export const BASE_URL = MOCK_API_URL;
 
 const TIMEOUT_MS = 10000;
 
@@ -125,26 +116,6 @@ async function request(
     if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
   }
 }
-
-// Legacy MockAPI client. Use only for features that have not been migrated yet.
-export const api = {
-  get: (path, options = {}) => request(path, {
-    ...options, baseUrl: MOCK_API_URL,
-    apiName: 'MockAPI',
-  }),
-  post: (path, body, options = {}) => request(path, {
-    ...options, method: 'POST', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
-  }),
-  put: (path, body, options = {}) => request(path, {
-    ...options, method: 'PUT', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
-  }),
-  patch: (path, body, options = {}) => request(path, {
-    ...options, method: 'PATCH', body, baseUrl: MOCK_API_URL, apiName: 'MockAPI',
-  }),
-  delete: (path, options = {}) => request(path, {
-    ...options, method: 'DELETE', baseUrl: MOCK_API_URL, apiName: 'MockAPI',
-  }),
-};
 
 // Express Backend client. All requests use the Backend URL and include the
 // stored JWT when available. It intentionally never falls back to MockAPI.
