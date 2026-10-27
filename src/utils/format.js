@@ -26,10 +26,14 @@ const KNOWN_LABELS = {
   '670000000000000000000202': 'Tote Bag',
 };
 
+// Mã ID database (24 ký tự hex) chưa có tên thì không hiển thị thô ra giao diện
+const isDatabaseId = (str) => /^[a-f0-9]{24}$/i.test(str);
+
 export const formatBrand = (val) => {
   if (!val) return '';
   const str = String(val).trim();
-  return KNOWN_LABELS[str] || str;
+  if (KNOWN_LABELS[str]) return KNOWN_LABELS[str];
+  return isDatabaseId(str) ? 'Other' : str;
 };
 
 export const formatCategory = (val) => {

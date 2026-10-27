@@ -10,7 +10,7 @@ import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import useFavorites from '../hooks/useFavorites';
 import { useHandbag } from '../hooks/useHandbags';
-import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
+import { formatBrand, formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
 import { getStockStatus, isPurchasable } from '../utils/catalog';
 import { tapLight } from '../utils/haptics';
@@ -145,7 +145,7 @@ export default function DetailScreen({ route, navigation }) {
         {/* Thông tin chính */}
         {!!handbag.brand && (
           <Text style={styles.brand}>
-            {isDatabaseId(handbag.brand) ? 'Other' : handbag.brand}
+            {formatBrand(handbag.brand)}
           </Text>
         )}
         <Text style={styles.name}>{handbag.handbagName}</Text>
@@ -207,7 +207,7 @@ export default function DetailScreen({ route, navigation }) {
                 </View>
                 <Text style={styles.infoLabel}>Brand</Text>
               </View>
-              <Text style={styles.infoValue}>{isDatabaseId(handbag.brand) ? 'Other' : handbag.brand}</Text>
+              <Text style={styles.infoValue}>{formatBrand(handbag.brand)}</Text>
             </View>
           )}
 

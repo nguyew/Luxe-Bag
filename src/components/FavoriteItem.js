@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import RemoteImage from './RemoteImage';
-import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
+import { formatBrand, formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 
 /**
  * Một dòng trong danh sách yêu thích: ảnh nhỏ, brand, tên, giá, % giảm
@@ -46,7 +46,7 @@ function FavoriteItem({ item, onOpen, onRemove }) {
         <View style={styles.textBlock}>
           {!!item.brand && (
             <Text style={styles.brand} numberOfLines={1}>
-              {item.brand}
+              {formatBrand(item.brand)}
             </Text>
           )}
           <Text style={styles.name} numberOfLines={2}>
@@ -55,10 +55,10 @@ function FavoriteItem({ item, onOpen, onRemove }) {
         </View>
 
         <View style={styles.priceRow}>
+          <Text style={styles.price}>{formatPrice(item.cost)}</Text>
           {!!formatOriginalPrice(item) && (
             <Text style={styles.originalPrice}>{formatOriginalPrice(item)}</Text>
           )}
-          <Text style={styles.price}>{formatPrice(item.cost)}</Text>
           {!!discount && (
             <View style={styles.discountPill}>
               <Text style={styles.discountText}>{discount} off</Text>
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 10,
     marginBottom: 12,
-    borderRadius: 26,
+    borderRadius: 30,
     backgroundColor: '#FFFFFF',
   },
 
@@ -114,6 +114,7 @@ const styles = StyleSheet.create({
 
   info: {
     flex: 1,
+    minWidth: 0, // cho phép nội dung co lại thay vì tràn ra ngoài card
     marginLeft: 14,
     paddingVertical: 4,
     justifyContent: 'space-between',
@@ -132,11 +133,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A1A1A',
   },
-  originalPrice: { textDecorationLine: 'line-through', color: '#8A837B', marginRight: 6 },
+  originalPrice: {
+    fontSize: 12,
+    color: '#8A837B',
+    textDecorationLine: 'line-through',
+  },
   priceRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap', // hết chỗ thì xuống dòng, không bị cắt
     alignItems: 'center',
-    gap: 8,
+    columnGap: 8,
+    rowGap: 4,
   },
   price: {
     fontSize: 15,
