@@ -33,11 +33,12 @@ export default function AdminHomeScreen({ navigation }) {
   const sales = users ? salesSummary(flattenOrders(users)) : null;
   const customers = users ? users.filter((item) => item.role === 'customer') : null;
 
-  const confirmLogout = () => {
-    Alert.alert('Sign out?', 'You can sign back in anytime.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => logout() },
-    ]);
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      Alert.alert('Unable to sign out', 'Please try again.');
+    }
   };
 
   const cards = [
@@ -107,7 +108,7 @@ export default function AdminHomeScreen({ navigation }) {
           subtitle="Here’s how the store is doing."
           right={
             <Pressable
-              onPress={confirmLogout}
+              onPress={handleLogout}
               style={styles.logout}
               hitSlop={8}
               accessibilityRole="button"

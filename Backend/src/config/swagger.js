@@ -5,8 +5,8 @@ const swaggerDefinition = {
   openapi: '3.0.3',
   info: {
     title: 'LuxeBag API',
-    version: '1.0.0',
-    description: 'Authentication and shopping API for LuxeBag.',
+    version: '1.1.0',
+    description: 'Authentication, catalog, shopping, and administration API for LuxeBag.',
   },
   servers: [{ url: '/' }],
   components: {
@@ -18,6 +18,98 @@ const swaggerDefinition = {
       },
     },
     schemas: {
+      Error: {
+        type: 'object',
+        properties: {
+          error: { type: 'string', example: 'Invalid input.' },
+          code: { type: 'string', example: 'invalid_input' },
+          details: { type: 'object', additionalProperties: true },
+        },
+      },
+      Address: {
+        type: 'object',
+        required: ['fullName', 'phone', 'line1', 'city'],
+        properties: {
+          fullName: { type: 'string', example: 'Jane Doe' },
+          phone: { type: 'string', example: '+1 555 0100' },
+          line1: { type: 'string', example: '123 Main Street' },
+          city: { type: 'string', example: 'New York' },
+        },
+      },
+      OrderItem: {
+        type: 'object',
+        properties: {
+          productId: { type: 'string' },
+          handbagId: { type: 'string' },
+          name: { type: 'string' },
+          brand: { type: 'string' },
+          uri: { type: 'string', format: 'uri' },
+          unitPrice: { type: 'number', format: 'double' },
+          qty: { type: 'integer', minimum: 1, maximum: 10 },
+        },
+      },
+      Order: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', readOnly: true },
+          status: { type: 'string', enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned', 'refunded'] },
+          items: { type: 'array', items: { $ref: '#/components/schemas/OrderItem' } },
+          subtotal: { type: 'number', format: 'double' },
+          discount: { type: 'number', format: 'double' },
+          shipping: { type: 'number', format: 'double' },
+          total: { type: 'number', format: 'double' },
+          address: { $ref: '#/components/schemas/Address' },
+          paymentMethod: { type: 'string', enum: ['cod', 'card'] },
+          paymentStatus: { type: 'string', enum: ['unpaid', 'paid'] },
+          couponCode: { type: 'string', nullable: true },
+          returnRequest: { type: 'object', nullable: true, additionalProperties: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      Coupon: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'cp-summer26' },
+          code: { type: 'string', example: 'SUMMER26' },
+          type: { type: 'string', enum: ['percent', 'fixed'] },
+          value: { type: 'number', format: 'double' },
+          minSubtotal: { type: 'number', format: 'double', minimum: 0 },
+          expiresAt: { type: 'string', format: 'date-time', nullable: true },
+          active: { type: 'boolean' },
+          usageLimit: { type: 'integer', minimum: 1, nullable: true },
+          usedCount: { type: 'integer', minimum: 0, readOnly: true },
+        },
+      },
+      Review: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', readOnly: true },
+          productId: { type: 'string' },
+          userId: { type: 'string' },
+          author: { type: 'string' },
+          rating: { type: 'integer', minimum: 1, maximum: 5 },
+          comment: { type: 'string', maxLength: 500 },
+          date: { type: 'string', format: 'date-time' },
+          hidden: { type: 'boolean' },
+        },
+      },
+      CartItem: {
+        type: 'object',
+        required: ['productId', 'qty'],
+        properties: {
+          productId: { type: 'string' },
+          qty: { type: 'integer', minimum: 1, maximum: 10 },
+        },
+      },
+      StylistRequest: {
+        type: 'object',
+        required: ['request', 'handbags'],
+        properties: {
+          request: { type: 'string', minLength: 1, maxLength: 1000 },
+          handbags: { type: 'array', items: { type: 'object', additionalProperties: true } },
+        },
+      },
       RegisterRequest: {
         type: 'object',
         required: ['name', 'email', 'password'],

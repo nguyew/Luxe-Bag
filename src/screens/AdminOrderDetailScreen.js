@@ -93,24 +93,6 @@ export default function AdminOrderDetailScreen({ route }) {
     );
   };
 
-  const confirmChange = (nextStatus) => {
-    const cancelling = nextStatus === 'cancelled';
-    Alert.alert(
-      `${STATUS_ACTION_LABEL[nextStatus]}?`,
-      cancelling
-        ? 'The customer will see the order as cancelled and the items go back into stock.'
-        : `The customer will see this order as ${nextStatus}.`,
-      [
-        { text: 'Back', style: 'cancel' },
-        {
-          text: STATUS_ACTION_LABEL[nextStatus],
-          style: cancelling ? 'destructive' : 'default',
-          onPress: () => change(nextStatus),
-        },
-      ]
-    );
-  };
-
   return (
     <ScrollView
       style={styles.screen}
@@ -135,7 +117,7 @@ export default function AdminOrderDetailScreen({ route }) {
             return (
               <Pressable
                 key={next}
-                onPress={() => confirmChange(next)}
+                onPress={() => change(next)}
                 disabled={busy !== null}
                 style={[
                   styles.action,
@@ -143,6 +125,7 @@ export default function AdminOrderDetailScreen({ route }) {
                   busy !== null && styles.actionBusy,
                 ]}
                 accessibilityRole="button"
+                accessibilityLabel={STATUS_ACTION_LABEL[next]}
               >
                 {busy === next ? (
                   <ActivityIndicator color={cancel ? '#B3261E' : '#FFFFFF'} />

@@ -62,16 +62,70 @@ router.post('/login', asyncHandler(login));
  *         description: Missing or invalid JWT
  */
 router.route('/me')
+  /**
+   * @swagger
+   * /api/auth/me:
+   *   get:
+   *     tags: [Authentication]
+   *     summary: Get the authenticated user
+   *     security: [{ bearerAuth: [] }]
+   *     responses:
+   *       200: { description: Current user }
+   *       401: { description: Missing or invalid JWT }
+   *   patch:
+   *     tags: [Authentication]
+   *     summary: Update the authenticated user's profile
+   *     security: [{ bearerAuth: [] }]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               name: { type: string }
+   *               phone: { type: string }
+   *               addresses: { type: array, items: { $ref: '#/components/schemas/Address' } }
+   *     responses:
+   *       200: { description: Profile updated }
+   *       400: { description: Invalid profile }
+   */
   .get(authenticate, getCurrentUser)
   .patch(authenticate, asyncHandler(updateCurrentUser));
 
-// Raw image uploads bypass JSON parsing and are stored in Backblaze B2.
+/**
+ * @swagger
+ * /api/auth/me/avatar:
+ *   put:
+ *     tags: [Authentication]
+ *     summary: Upload the authenticated user's avatar
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         image/jpeg: { schema: { type: string, format: binary } }
+ *         image/png: { schema: { type: string, format: binary } }
+ *         image/webp: { schema: { type: string, format: binary } }
+ *     responses:
+ *       200: { description: Avatar uploaded }
+ *       400: { description: Invalid image body or type }
+ */
 router.put(
   '/me/avatar',
   authenticate,
   express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
   asyncHandler(updateAvatar)
 );
+/**
+ * @swagger
+ * /api/auth/me/avatar:
+ *   delete:
+ *     tags: [Authentication]
+ *     summary: Delete the authenticated user's avatar
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Avatar deleted }
+ */
 router.delete('/me/avatar', authenticate, asyncHandler(deleteAvatar));
 
 module.exports = router;

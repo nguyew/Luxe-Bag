@@ -29,15 +29,170 @@ const router = express.Router();
 
 router.use(authenticate, requireAdmin);
 
-// Admin order management (orders are stored in the Order collection, not User documents).
+/**
+ * @swagger
+ * /api/admin/orders:
+ *   get:
+ *     tags: [Admin - Orders]
+ *     summary: List all customer orders
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 500 } }
+ *       - { in: query, name: status, schema: { type: string } }
+ *     responses:
+ *       200: { description: Paginated orders }
+ */
 router.get('/orders', asyncHandler(listAdminOrders));
+/**
+ * @swagger
+ * /api/admin/orders/{id}/status:
+ *   patch:
+ *     tags: [Admin - Orders]
+ *     summary: Update an order status
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status: { type: string }
+ *     responses:
+ *       200: { description: Order updated }
+ *       400: { description: Invalid status }
+ *       404: { description: Order not found }
+ */
 router.patch('/orders/:id/status', asyncHandler(updateAdminOrderStatus));
+/**
+ * @swagger
+ * /api/admin/orders/{id}/return-request:
+ *   patch:
+ *     tags: [Admin - Orders]
+ *     summary: Approve or reject an order return request
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [decision]
+ *             properties:
+ *               decision: { type: string, enum: [approved, rejected] }
+ *               restock: { type: boolean, default: false }
+ *               note: { type: string }
+ *     responses:
+ *       200: { description: Return request resolved }
+ *       400: { description: Invalid decision }
+ *       404: { description: Order not found }
+ */
 router.patch('/orders/:id/return-request', asyncHandler(resolveAdminReturn));
+/**
+ * @swagger
+ * /api/admin/reviews:
+ *   get:
+ *     tags: [Admin - Reviews]
+ *     summary: List product reviews for moderation
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: productId, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Reviews
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 reviews: { type: array, items: { $ref: '#/components/schemas/Review' } }
+ */
 router.get('/reviews', asyncHandler(listAdminReviews));
+/**
+ * @swagger
+ * /api/admin/reviews/{reviewId}/moderation:
+ *   patch:
+ *     tags: [Admin - Reviews]
+ *     summary: Hide or show a product review
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: reviewId, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [hidden]
+ *             properties:
+ *               hidden: { type: boolean }
+ *     responses:
+ *       200: { description: Review moderated }
+ *       404: { description: Review not found }
+ */
 router.patch('/reviews/:reviewId/moderation', asyncHandler(moderateReview));
 router.delete('/reviews/:reviewId', asyncHandler(deleteAdminReview));
+/**
+ * @swagger
+ * /api/admin/coupons:
+ *   get:
+ *     tags: [Admin - Coupons]
+ *     summary: List all coupons
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Coupons }
+ *   post:
+ *     tags: [Admin - Coupons]
+ *     summary: Create a coupon
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/Coupon'
+ *             required: [id, code, type, value]
+ *     responses:
+ *       201: { description: Coupon created }
+ *       400: { description: Invalid coupon }
+ *       409: { description: Duplicate coupon }
+ */
 router.get('/coupons', asyncHandler(listAdminCoupons));
 router.post('/coupons', asyncHandler(createCoupon));
+/**
+ * @swagger
+ * /api/admin/coupons/{id}:
+ *   patch:
+ *     tags: [Admin - Coupons]
+ *     summary: Update a coupon
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/Coupon' }
+ *     responses:
+ *       200: { description: Coupon updated }
+ *       404: { description: Coupon not found }
+ *   delete:
+ *     tags: [Admin - Coupons]
+ *     summary: Delete a coupon
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Coupon deleted }
+ *       404: { description: Coupon not found }
+ */
 router.patch('/coupons/:id', asyncHandler(updateCoupon));
 router.delete('/coupons/:id', asyncHandler(deleteCoupon));
 
@@ -198,14 +353,6 @@ router.post(
   express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '10mb' }),
   asyncHandler(uploadImageProxy)
 );
-router.route('/products')
-  .post(asyncHandler(createProduct))
-  .get(asyncHandler(listProducts));
-router.route('/products/:id')
-  .get(asyncHandler(getProduct))
-  .patch(asyncHandler(updateProduct))
-  .delete(asyncHandler(deleteProduct));
-
 /**
  * @swagger
  * /api/admin/customers:

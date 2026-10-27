@@ -193,11 +193,12 @@ export default function ProfileScreen({ navigation }) {
     }
   }, [nameDraft, user, updateAccount]);
 
-  const confirmLogout = () => {
-    Alert.alert('Sign out?', 'You can sign back in anytime.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => logout() },
-    ]);
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      Alert.alert('Unable to sign out', 'Please try again.');
+    }
   };
 
   // Khách chưa đăng nhập
@@ -336,7 +337,7 @@ export default function ProfileScreen({ navigation }) {
         </Pressable>
 
         <Pressable
-          onPress={confirmLogout}
+          onPress={handleLogout}
           style={styles.logoutButton}
           accessibilityRole="button"
           accessibilityLabel="Sign out"

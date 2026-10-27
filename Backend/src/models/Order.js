@@ -1,4 +1,8 @@
 const mongoose = require('mongoose');
+const { randomBytes } = require('crypto');
+
+const createOrderNumber = () =>
+  `LB-${Date.now().toString(36).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`;
 
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -11,6 +15,7 @@ const orderItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
+  orderNumber: { type: String, required: true, unique: true, default: createOrderNumber },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   status: { type: String, enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'returned'], default: 'pending', index: true },
   items: { type: [orderItemSchema], required: true },
