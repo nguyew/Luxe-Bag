@@ -148,8 +148,6 @@ src/
 Backend/
   src/          Express app: config, controllers, middleware, models (Mongoose), routes
   scripts/      seed-mongodb.js, seed-feedbacks.js, add-men-sports-office-bags.js
-tests/          legacy logic and UI tests (see Testing)
-docs/           phases/ (notes from each development phase), mockapi-schema.md (legacy)
 ```
 
 ### Backend API at a glance
