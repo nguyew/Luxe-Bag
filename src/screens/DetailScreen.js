@@ -17,6 +17,15 @@ import { tapLight } from '../utils/haptics';
 
 const BAR_HEIGHT = 56;
 
+// Older seed data may contain taxonomy IDs instead of readable names.
+// Never expose raw numeric IDs in the customer-facing product detail screen.
+const displayTaxonomyName = (value, fallback) => {
+  if (value === null || value === undefined || value === '') return '';
+  const textValue = String(value).trim();
+  if (/^\d{15,}$/.test(textValue)) return fallback;
+  return textValue;
+};
+
 export default function DetailScreen({ route, navigation }) {
   // Dữ liệu truyền qua route hiện ngay; bản mới nhất trong kho (ví dụ feedback
   // vừa thêm) sẽ tự thay thế khi có.
@@ -72,6 +81,8 @@ export default function DetailScreen({ route, navigation }) {
 
   const favorite = isFavorite(handbag.id);
   const discount = formatPercentOff(handbag.percentOff);
+  const brandName = displayTaxonomyName(handbag.brand, 'Other');
+  const categoryName = displayTaxonomyName(handbag.category, 'Uncategorized');
   const colors = Array.isArray(handbag.color)
     ? handbag.color
     : handbag.color
@@ -136,7 +147,7 @@ export default function DetailScreen({ route, navigation }) {
         </View>
 
         {/* Thông tin chính */}
-        {!!handbag.brand && <Text style={styles.brand}>{handbag.brand}</Text>}
+        {!!brandName && brandName !== 'Other' && <Text style={styles.brand}>{brandName}</Text>}
         <Text style={styles.name}>{handbag.handbagName}</Text>
 
         {summary.total > 0 && (
@@ -169,17 +180,17 @@ export default function DetailScreen({ route, navigation }) {
 
         {/* Thuộc tính */}
         <View style={styles.infoCard}>
-          {!!handbag.category && (
+          {!!categoryName && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Category</Text>
-              <Text style={styles.infoValue}>{handbag.category}</Text>
+              <Text style={styles.infoValue}>{categoryName}</Text>
             </View>
           )}
 
-          {!!handbag.brand && (
+          {!!brandName && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Brand</Text>
-              <Text style={styles.infoValue}>{handbag.brand}</Text>
+              <Text style={styles.infoValue}>{brandName}</Text>
             </View>
           )}
 

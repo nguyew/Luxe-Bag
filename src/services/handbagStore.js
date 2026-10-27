@@ -67,11 +67,33 @@ export function normalizeHandbags(list) {
 
   return list
     .filter((item) => item && typeof item === 'object')
-    .map((item, index) => ({
-      ...item,
-      id: ensureId(item, index),
-      uri: item.uri || item.image || item.imageUrl || '',
-    }));
+    .map((item, index) => {
+      // Backend Product schema uses name/price/images/inventoryQuantity while
+      // older app screens use handbagName/cost/uri/stock. Normalize both here.
+      const primaryImage = Array.isArray(item.images)
+        ? item.images.find((image) => image?.isPrimary && image?.url)?.url
+          || [...item.images].sort((a, b) => (a?.sortOrder ?? 0) - (b?.sortOrder ?? 0)).find((image) => image?.url)?.url
+        : '';
+      const inventory = item.inventoryQuantity;
+      const reserved = Number(item.reservedQuantity || 0);
+      const normalizedStock = inventory !== undefined && inventory !== null
+        ? Math.max(0, Number(inventory) - reserved)
+        : item.stock;
+      const rawDiscount = item.discountPercent ?? item.percentOff ?? 0;
+      const normalizedDiscount = Number(rawDiscount) > 1 ? Number(rawDiscount) / 100 : Number(rawDiscount);
+
+      return {
+        ...item,
+        id: ensureId(item, index),
+        handbagName: item.handbagName || item.name || item.title || `Handbag ${index + 1}`,
+        cost: item.cost ?? item.price ?? 0,
+        originalCost: item.originalCost ?? item.compareAtPrice ?? undefined,
+        percentOff: Number.isFinite(normalizedDiscount) ? normalizedDiscount : 0,
+        stock: normalizedStock,
+        uri: item.uri || item.image || item.imageUrl || primaryImage || '',
+        color: item.color?.length ? item.color : (item.colors || []),
+      };
+    });
 }
 
 /** Replace the shared catalog with an authoritative product list. */

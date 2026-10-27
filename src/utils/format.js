@@ -1,6 +1,6 @@
 export const formatPrice = (price) =>
-  `$${Number(price || 0).toLocaleString('en-US', {
-    maximumFractionDigits: 2,
+  `₫${Number(price || 0).toLocaleString('vi-VN', {
+    maximumFractionDigits: 0,
   })}`;
 
 export const formatOriginalPrice = (item) => {
