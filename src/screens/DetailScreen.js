@@ -12,10 +12,17 @@ import useFavorites from '../hooks/useFavorites';
 import { useHandbag } from '../hooks/useHandbags';
 import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
-import { getStock, isPurchasable } from '../utils/catalog';
+import { getStockStatus, isPurchasable } from '../utils/catalog';
 import { tapLight } from '../utils/haptics';
 
 const BAR_HEIGHT = 56;
+
+// Màu cho từng tình trạng hàng
+const STOCK_TONES = {
+  in: { color: '#1F7A3E', pill: { backgroundColor: '#DFF3E5' } },
+  low: { color: '#8A5A00', pill: { backgroundColor: '#FFF1D6' } },
+  out: { color: '#B3261E', pill: { backgroundColor: '#FBE3E1' } },
+};
 
 
 // Hide raw database IDs (for example, 670000000000000000000101) from customer-facing UI.
@@ -83,13 +90,8 @@ export default function DetailScreen({ route, navigation }) {
     ? [handbag.color]
     : [];
   const hasGender = typeof handbag.gender === 'boolean';
-  const stock = getStock(handbag);
   const purchasable = isPurchasable(handbag);
-  const stockLabel = !purchasable
-    ? 'Out of stock'
-    : stock !== null && stock <= 5
-    ? `Only ${stock} left`
-    : null;
+  const stockStatus = getStockStatus(handbag);
 
   return (
     <View style={styles.screen}>
@@ -162,18 +164,24 @@ export default function DetailScreen({ route, navigation }) {
           {!!formatOriginalPrice(handbag) && (
             <Text style={styles.originalPrice}>{formatOriginalPrice(handbag)}</Text>
           )}
-          {!!stockLabel && (
-            <View style={[styles.stockPill, !purchasable && styles.stockPillOut]}>
-              <Text style={[styles.stockText, !purchasable && styles.stockTextOut]}>
-                {stockLabel}
-              </Text>
-            </View>
-          )}
           {!!discount && (
             <View style={styles.discountPill}>
               <Text style={styles.discountText}>{discount} off</Text>
             </View>
           )}
+          <View
+            style={[styles.stockPill, STOCK_TONES[stockStatus.key].pill]}
+            accessibilityLabel={`Availability: ${stockStatus.label}`}
+          >
+            <Ionicons
+              name={stockStatus.icon}
+              size={15}
+              color={STOCK_TONES[stockStatus.key].color}
+            />
+            <Text style={[styles.stockText, { color: STOCK_TONES[stockStatus.key].color }]}>
+              {stockStatus.label}
+            </Text>
+          </View>
         </View>
 
         {/* Thuộc tính */}
@@ -530,21 +538,17 @@ const styles = StyleSheet.create({
 
   // Nhãn tồn kho cạnh giá
   stockPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: '#FFF1D6',
-  },
-  stockPillOut: {
-    backgroundColor: '#FBE3E1',
   },
   stockText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8A5A00',
-  },
-  stockTextOut: {
-    color: '#B3261E',
   },
 
   // Không có dữ liệu

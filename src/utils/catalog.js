@@ -41,3 +41,23 @@ export function maxQtyFor(handbag) {
 export function isPurchasable(handbag) {
   return !!handbag && isPublished(handbag) && maxQtyFor(handbag) > 0;
 }
+
+// Từ ngưỡng này trở xuống thì báo "Only N left"
+export const LOW_STOCK_LIMIT = 5;
+
+/**
+ * Tình trạng hàng để hiển thị cho khách:
+ *  - out:  hết hàng (stock = 0) hoặc sản phẩm không còn bán
+ *  - low:  sắp hết (còn <= LOW_STOCK_LIMIT)
+ *  - in:   còn hàng (kể cả khi chưa theo dõi tồn kho)
+ */
+export function getStockStatus(handbag) {
+  const stock = getStock(handbag);
+  if (!isPublished(handbag) || stock === 0) {
+    return { key: 'out', label: 'Out of stock', icon: 'close-circle' };
+  }
+  if (stock !== null && stock <= LOW_STOCK_LIMIT) {
+    return { key: 'low', label: `Only ${stock} left`, icon: 'alert-circle' };
+  }
+  return { key: 'in', label: 'In stock', icon: 'checkmark-circle' };
+}
