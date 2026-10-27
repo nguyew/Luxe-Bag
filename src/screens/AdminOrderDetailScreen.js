@@ -15,7 +15,7 @@ import TextPromptModal from '../components/TextPromptModal';
 import useHandbags from '../hooks/useHandbags';
 import { fetchAdminUsers, resolveReturn, updateOrderStatus } from '../services/adminService';
 import { describeOrderError } from '../services/orderService';
-import { formatPrice } from '../utils/format';
+import { formatBrand, formatPrice } from '../utils/format';
 import {
   RETURN_STATUS,
   STATUS_ACTION_LABEL,
@@ -241,7 +241,7 @@ export default function AdminOrderDetailScreen({ route }) {
               <RemoteImage uri={item.uri} style={styles.thumbImage} />
             </View>
             <View style={styles.itemBody}>
-              {!!item.brand && <Text style={styles.brand}>{item.brand}</Text>}
+              {!!item.brand && <Text style={styles.brand}>{formatBrand(item.brand)}</Text>}
               <Text style={styles.itemName} numberOfLines={2}>
                 {item.name}
               </Text>

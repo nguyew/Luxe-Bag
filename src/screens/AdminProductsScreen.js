@@ -22,7 +22,7 @@ import { fetchAdminProducts } from '../services/adminService';
 import { normalizeHandbags, replaceHandbags } from '../services/handbagStore';
 import { LOW_STOCK_THRESHOLD, inventoryStats } from '../utils/admin';
 import { getStock } from '../utils/catalog';
-import { formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
+import { formatBrand, formatOriginalPrice, formatPercentOff, formatPrice } from '../utils/format';
 
 const statusOf = (item) =>
   item.status === 'draft' || item.status === 'archived' ? item.status : 'published';
@@ -200,7 +200,7 @@ const ProductRow = React.memo(function ProductRow({ item, onPress }) {
 
       <View style={styles.body}>
         <Text style={styles.brand} numberOfLines={1}>
-          {item.brand || 'No brand'}
+          {item.brand ? formatBrand(item.brand) : 'No brand'}
         </Text>
         <Text style={styles.name} numberOfLines={2}>
           {item.handbagName}

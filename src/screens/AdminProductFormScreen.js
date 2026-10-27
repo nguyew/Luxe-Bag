@@ -19,6 +19,7 @@ import { PRODUCT_STATUS } from '../components/ProductStatusBadge';
 import useHandbags, { useHandbag } from '../hooks/useHandbags';
 import { createHandbag, deleteHandbag, updateHandbag, uploadProductImage } from '../services/adminService';
 import { getStock } from '../utils/catalog';
+import { formatBrand, formatCategory, knownLabel } from '../utils/format';
 
 const IMAGE_URL = /^https?:\/\/\S+$/i;
 const STATUS_KEYS = ['draft', 'published', 'archived'];
@@ -49,6 +50,9 @@ export default function AdminProductFormScreen({ navigation, route }) {
   const [name, setName] = useState(existing?.handbagName || '');
   const [brand, setBrand] = useState(existing?.brand || '');
   const [category, setCategory] = useState(existing?.category || '');
+  // Hiện tên dễ đọc thay cho mã ID trong ô nhập; giá trị lưu chỉ đổi khi admin tự gõ hoặc chọn gợi ý
+  const [brandTyped, setBrandTyped] = useState(false);
+  const [categoryTyped, setCategoryTyped] = useState(false);
   const [cost, setCost] = useState(existing?.cost !== undefined ? String(existing.cost) : '');
   const [discount, setDiscount] = useState(existing ? percentText(existing.percentOff) : '');
   const [colors, setColors] = useState(
@@ -78,14 +82,14 @@ export default function AdminProductFormScreen({ navigation, route }) {
     () =>
       [...new Set(allItems.map((item) => item.brand).filter(Boolean))]
         .sort()
-        .map((value) => ({ key: value, label: value })),
+        .map((value) => ({ key: value, label: formatBrand(value) })),
     [allItems]
   );
   const categoryOptions = useMemo(
     () =>
       [...new Set(allItems.map((item) => item.category).filter(Boolean))]
         .sort()
-        .map((value) => ({ key: value, label: value })),
+        .map((value) => ({ key: value, label: formatCategory(value) })),
     [allItems]
   );
 
@@ -272,8 +276,11 @@ export default function AdminProductFormScreen({ navigation, route }) {
         <AuthField
           ref={brandRef}
           label="Brand"
-          value={brand}
-          onChangeText={setBrand}
+          value={!brandTyped && knownLabel(brand) ? knownLabel(brand) : brand}
+          onChangeText={(text) => {
+            setBrandTyped(true);
+            setBrand(text);
+          }}
           error={errors.brand}
           placeholder="e.g. Fendi"
           autoCapitalize="words"
@@ -283,15 +290,25 @@ export default function AdminProductFormScreen({ navigation, route }) {
         />
         {brandOptions.length > 0 && (
           <View style={styles.suggest}>
-            <FilterChips options={brandOptions} value={brand} onChange={setBrand} />
+            <FilterChips
+              options={brandOptions}
+              value={brand}
+              onChange={(value) => {
+                setBrandTyped(false);
+                setBrand(value);
+              }}
+            />
           </View>
         )}
 
         <AuthField
           ref={categoryRef}
           label="Category"
-          value={category}
-          onChangeText={setCategory}
+          value={!categoryTyped && knownLabel(category) ? knownLabel(category) : category}
+          onChangeText={(text) => {
+            setCategoryTyped(true);
+            setCategory(text);
+          }}
           placeholder="e.g. Shoulder Bag"
           autoCapitalize="words"
           returnKeyType="next"
@@ -300,7 +317,14 @@ export default function AdminProductFormScreen({ navigation, route }) {
         />
         {categoryOptions.length > 0 && (
           <View style={styles.suggest}>
-            <FilterChips options={categoryOptions} value={category} onChange={setCategory} />
+            <FilterChips
+              options={categoryOptions}
+              value={category}
+              onChange={(value) => {
+                setCategoryTyped(false);
+                setCategory(value);
+              }}
+            />
           </View>
         )}
 
@@ -308,11 +332,11 @@ export default function AdminProductFormScreen({ navigation, route }) {
           <View style={styles.col}>
             <AuthField
               ref={costRef}
-              label="Price ($)"
+              label="Price (₫)"
               value={cost}
               onChangeText={setCost}
               error={errors.cost}
-              placeholder="0.00"
+              placeholder="0"
               keyboardType="decimal-pad"
               returnKeyType="next"
               onSubmitEditing={() => discountRef.current?.focus()}

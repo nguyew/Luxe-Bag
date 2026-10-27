@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FilterChips from './FilterChips';
 import { applyBulkDiscount } from '../services/adminService';
+import { formatBrand, formatCategory } from '../utils/format';
 
 /**
  * Giảm giá hàng loạt theo tên sản phẩm, thương hiệu hoặc danh mục.
@@ -42,13 +43,15 @@ export default function BulkDiscountSheet({ visible, items, onClose, onApplied }
     () => [
       { key: 'all', label: 'All products' },
       ...names.map((name) => ({ key: `name:${name}`, label: `Name: ${name}` })),
-      ...brands.map((brand) => ({ key: `brand:${brand}`, label: `Brand: ${brand}` })),
-      ...categories.map((category) => ({ key: `category:${category}`, label: `Category: ${category}` })),
+      ...brands.map((brand) => ({ key: `brand:${brand}`, label: `Brand: ${formatBrand(brand)}` })),
+      ...categories.map((category) => ({ key: `category:${category}`, label: `Category: ${formatCategory(category)}` })),
     ],
     [brands, categories, names]
   );
 
   const [scope, targetValue] = target === 'all' ? ['all', ''] : target.split(':');
+  // Tên dễ đọc của mục đang chọn, dùng trong hộp thoại xác nhận
+  const targetLabel = options.find((option) => option.key === target)?.label || target;
   const affected = useMemo(
     () => items.filter((item) => scope === 'all' || item[scope === 'name' ? 'handbagName' : scope] === targetValue),
     [items, scope, targetValue]
@@ -64,7 +67,7 @@ export default function BulkDiscountSheet({ visible, items, onClose, onApplied }
     Alert.alert(
       'Apply discount?',
       `${what} ${affected.length} ${affected.length === 1 ? 'product' : 'products'}${
-        target === 'all' ? '' : ` (${target})`
+        target === 'all' ? '' : ` (${targetLabel})`
       }.`,
       [
         { text: 'Cancel', style: 'cancel' },

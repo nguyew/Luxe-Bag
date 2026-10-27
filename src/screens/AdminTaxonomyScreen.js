@@ -13,8 +13,12 @@ import TextPromptModal from '../components/TextPromptModal';
 import useHandbags from '../hooks/useHandbags';
 import { bulkUpdateHandbags } from '../services/adminService';
 import { facetOptions } from '../utils/filters';
+import { formatBrand, formatCategory } from '../utils/format';
 
 const FIELD_LABEL = { brand: 'brand', category: 'category' };
+
+// Tên dễ đọc của một giá trị (mã ID -> tên), chỉ để hiển thị
+const labelFor = (field, value) => (field === 'brand' ? formatBrand(value) : formatCategory(value));
 
 /** Quản lý thương hiệu & danh mục: đổi tên hàng loạt (hoặc gộp vào mục đã có). */
 export default function AdminTaxonomyScreen() {
@@ -52,7 +56,7 @@ export default function AdminTaxonomyScreen() {
       if (exists) {
         Alert.alert(
           `Merge into “${to}”?`,
-          `All products in “${value}” will move to the existing ${FIELD_LABEL[field]} “${to}”.`,
+          `All products in “${labelFor(field, value)}” will move to the existing ${FIELD_LABEL[field]} “${to}”.`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Merge', onPress: () => rename(field, value, to) },
@@ -79,10 +83,10 @@ export default function AdminTaxonomyScreen() {
               disabled={busy}
               style={[styles.row, index < options.length - 1 && styles.rowDivider]}
               accessibilityRole="button"
-              accessibilityLabel={`Rename ${option.value}`}
+              accessibilityLabel={`Rename ${labelFor(field, option.value)}`}
             >
               <View style={styles.rowText}>
-                <Text style={styles.name}>{option.value}</Text>
+                <Text style={styles.name}>{labelFor(field, option.value)}</Text>
                 <Text style={styles.count}>
                   {option.count} {option.count === 1 ? 'product' : 'products'}
                 </Text>
@@ -124,9 +128,9 @@ export default function AdminTaxonomyScreen() {
       <TextPromptModal
         visible={!!target}
         title={target ? `Rename ${FIELD_LABEL[target.field]}` : ''}
-        message={target ? `Current name: ${target.value}` : ''}
+        message={target ? `Current name: ${labelFor(target.field, target.value)}` : ''}
         placeholder="New name"
-        initialValue={target ? target.value : ''}
+        initialValue={target ? labelFor(target.field, target.value) : ''}
         confirmLabel="Rename"
         required
         maxLength={40}

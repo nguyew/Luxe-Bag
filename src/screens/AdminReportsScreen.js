@@ -13,7 +13,7 @@ import BarChart from '../components/BarChart';
 import FilterChips from '../components/FilterChips';
 import useAdminUsers from '../hooks/useAdminUsers';
 import { buildReport, flattenOrders } from '../utils/admin';
-import { formatPrice } from '../utils/format';
+import { formatBrand, formatPrice } from '../utils/format';
 import { ORDER_STATUS } from '../utils/orders';
 
 const PERIODS = [
@@ -123,7 +123,7 @@ export default function AdminReportsScreen() {
                   <View style={[styles.fill, { width: `${(item.revenue / maxProduct) * 100}%` }]} />
                 </View>
                 <Text style={styles.rankSub}>
-                  {item.qty} sold{item.brand ? ` · ${item.brand}` : ''}
+                  {item.qty} sold{item.brand ? ` · ${formatBrand(item.brand)}` : ''}
                 </Text>
               </View>
             </View>
@@ -139,7 +139,7 @@ export default function AdminReportsScreen() {
           report.byBrand.map((item) => (
             <View key={item.brand} style={styles.brandRow}>
               <View style={styles.rankTop}>
-                <Text style={styles.rankName}>{item.brand}</Text>
+                <Text style={styles.rankName}>{formatBrand(item.brand)}</Text>
                 <Text style={styles.rankValue}>{formatPrice(item.revenue)}</Text>
               </View>
               <View style={styles.track}>

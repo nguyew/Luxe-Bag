@@ -26,6 +26,9 @@ const KNOWN_LABELS = {
   '670000000000000000000202': 'Tote Bag',
 };
 
+/** Tên đã biết của một mã brand/category, hoặc '' nếu chưa có trong bảng. */
+export const knownLabel = (val) => KNOWN_LABELS[String(val ?? '').trim()] || '';
+
 // Mã ID database (24 ký tự hex) chưa có tên thì không hiển thị thô ra giao diện
 const isDatabaseId = (str) => /^[a-f0-9]{24}$/i.test(str);
 
