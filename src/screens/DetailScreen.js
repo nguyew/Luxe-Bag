@@ -17,14 +17,10 @@ import { tapLight } from '../utils/haptics';
 
 const BAR_HEIGHT = 56;
 
-// Older seed data may contain taxonomy IDs instead of readable names.
-// Never expose raw numeric IDs in the customer-facing product detail screen.
-const displayTaxonomyName = (value, fallback) => {
-  if (value === null || value === undefined || value === '') return '';
-  const textValue = String(value).trim();
-  if (/^\d{15,}$/.test(textValue)) return fallback;
-  return textValue;
-};
+
+// Hide raw database IDs (for example, 670000000000000000000101) from customer-facing UI.
+const isDatabaseId = (value) =>
+  typeof value === 'string' && /^[a-f0-9]{24}$/i.test(value.trim());
 
 export default function DetailScreen({ route, navigation }) {
   // Dữ liệu truyền qua route hiện ngay; bản mới nhất trong kho (ví dụ feedback
@@ -81,8 +77,6 @@ export default function DetailScreen({ route, navigation }) {
 
   const favorite = isFavorite(handbag.id);
   const discount = formatPercentOff(handbag.percentOff);
-  const brandName = displayTaxonomyName(handbag.brand, 'Other');
-  const categoryName = displayTaxonomyName(handbag.category, 'Uncategorized');
   const colors = Array.isArray(handbag.color)
     ? handbag.color
     : handbag.color
@@ -147,7 +141,7 @@ export default function DetailScreen({ route, navigation }) {
         </View>
 
         {/* Thông tin chính */}
-        {!!brandName && brandName !== 'Other' && <Text style={styles.brand}>{brandName}</Text>}
+        {!!handbag.brand && <Text style={styles.brand}>{isDatabaseId(handbag.brand) ? 'Other' : handbag.brand}</Text>}
         <Text style={styles.name}>{handbag.handbagName}</Text>
 
         {summary.total > 0 && (
@@ -180,17 +174,17 @@ export default function DetailScreen({ route, navigation }) {
 
         {/* Thuộc tính */}
         <View style={styles.infoCard}>
-          {!!categoryName && (
+          {!!handbag.category && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Category</Text>
-              <Text style={styles.infoValue}>{categoryName}</Text>
+              <Text style={styles.infoValue}>{isDatabaseId(handbag.category) ? 'Uncategorized' : handbag.category}</Text>
             </View>
           )}
 
-          {!!brandName && (
+          {!!handbag.brand && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Brand</Text>
-              <Text style={styles.infoValue}>{brandName}</Text>
+              <Text style={styles.infoValue}>{isDatabaseId(handbag.brand) ? 'Other' : handbag.brand}</Text>
             </View>
           )}
 
@@ -281,7 +275,7 @@ const styles = StyleSheet.create({
   // Ảnh
   imageWrap: {
     width: '100%',
-    aspectRatio: 0.9,
+    aspectRatio: 0.98,
     borderRadius: 26,
     overflow: 'hidden',
     backgroundColor: '#E7E3DF',
@@ -312,14 +306,14 @@ const styles = StyleSheet.create({
 
   // Tiêu đề
   brand: {
-    marginTop: 20,
-    fontSize: 13,
+    marginTop: 22,
+    fontSize: 14,
     color: '#77716A',
   },
   name: {
-    marginTop: 4,
-    fontSize: 26,
-    lineHeight: 32,
+    marginTop: 6,
+    fontSize: 27,
+    lineHeight: 34,
     fontWeight: '800',
     letterSpacing: -0.8,
     color: '#0D0D0D',
@@ -337,11 +331,12 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 14,
+    flexWrap: 'wrap',
+    marginTop: 18,
     gap: 10,
   },
   price: {
-    fontSize: 24,
+    fontSize: 25,
     fontWeight: '700',
     color: '#1A1A1A',
   },
@@ -364,7 +359,7 @@ const styles = StyleSheet.create({
 
   // Thuộc tính
   infoCard: {
-    marginTop: 22,
+    marginTop: 24,
     backgroundColor: '#FFFFFF',
     borderRadius: 26,
     paddingHorizontal: 18,
@@ -373,7 +368,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E4DFDA',
     gap: 12,
@@ -382,11 +377,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#77716A',
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1A1A1A',
   },
