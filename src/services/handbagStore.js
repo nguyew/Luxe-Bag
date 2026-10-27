@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { getHandbags } from './api';
 
-const CACHE_KEY = '@luxebag/handbags-cache';
+const CACHE_KEY = '@luxebag/handbags-cache-v2'; // v2: discards caches saved with the wrong stock field
 export const STALE_MS = 60 * 1000;
 const ERROR_MESSAGE = 'Could not load handbags. Check your connection and try again.';
 
@@ -74,11 +74,17 @@ export function normalizeHandbags(list) {
         ? item.images.find((image) => image?.isPrimary && image?.url)?.url
           || [...item.images].sort((a, b) => (a?.sortOrder ?? 0) - (b?.sortOrder ?? 0)).find((image) => image?.url)?.url
         : '';
-      const inventory = item.inventoryQuantity;
-      const reserved = Number(item.reservedQuantity || 0);
-      const normalizedStock = inventory !== undefined && inventory !== null
-        ? Math.max(0, Number(inventory) - reserved)
-        : item.stock;
+      // `stock` is the field the Backend uses everywhere (checkout, admin edits), so it is the
+      // source of truth. `inventoryQuantity` / `reservedQuantity` only exist on documents created
+      // by the old seed script; use them only when `stock` is missing, never to override it.
+      // (Preferring them made a sold-out bag show "In stock" until checkout rejected it.)
+      const hasStock = item.stock !== undefined && item.stock !== null && item.stock !== '';
+      const legacyInventory = item.inventoryQuantity;
+      const normalizedStock = hasStock
+        ? item.stock
+        : legacyInventory !== undefined && legacyInventory !== null
+          ? Math.max(0, Number(legacyInventory) - Number(item.reservedQuantity || 0))
+          : item.stock;
       const rawDiscount = item.discountPercent ?? item.percentOff ?? 0;
       const normalizedDiscount = Number(rawDiscount) > 1 ? Number(rawDiscount) / 100 : Number(rawDiscount);
 
