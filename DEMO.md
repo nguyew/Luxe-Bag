@@ -1,59 +1,78 @@
-# Kịch bản demo (≈ 10 phút)
+# Demo script (≈ 10 minutes)
 
-## Trước buổi demo (làm trước ít nhất 30 phút)
+## Before the demo (at least 30 minutes ahead)
 
-- [ ] `node scripts/check-setup.js` → không còn dòng ✗.
-- [ ] Mở app một lần khi có mạng để cache dữ liệu (phòng khi mạng phòng demo yếu: app vẫn chạy offline với dữ liệu đã lưu).
-- [ ] Chuẩn bị **2 thiết bị / 2 cửa sổ**: một đăng nhập admin, một dùng làm khách (hoặc đăng xuất / đăng nhập lần lượt).
-- [ ] Trên mockapi.io: mỗi sản phẩm `stock` ≥ 3; đặt 1 sản phẩm `stock = 1` để demo "sắp hết hàng".
-- [ ] Tạo sẵn mã giảm giá `SAVE10` (10%, đơn tối thiểu $100) trong Admin → Discount codes.
-- [ ] Tạo sẵn 1 tài khoản khách đã có đơn **Delivered** (để demo viết đánh giá và trả hàng không phải chờ).
-- [ ] Sạc pin, tắt thông báo, tăng độ sáng màn hình.
+- [ ] Start **MongoDB**, then the backend: `cd Backend && npm run dev`. Open `http://<LAN IP>:5000/api/health` in the phone's browser; it should report the database as connected.
+- [ ] `EXPO_PUBLIC_BACKEND_URL` in the root `.env` matches your computer's current LAN IP (it changes between networks). Then run `npx expo start -c`.
+- [ ] Seed data: `npm run seed` and `npm run seed:feedbacks` (inside `Backend/`). Make sure the catalog has published products.
+- [ ] Open the app once while online so the catalog is cached (the app still works offline with saved data if the demo-room network is weak).
+- [ ] Prepare **2 devices / 2 windows**: one signed in as admin (`admin@luxebag.com` / `Admin@123`), one as the customer (or sign out and in as needed).
+- [ ] In **Admin → Products**, make sure each product has `stock` ≥ 3, and set one product to `stock = 1` to show the stock limit (only one unit can be added to the cart). Set another to `0` to show the "Sold out" label.
+- [ ] Create the coupon `SAVE10` (10%, minimum order $100) in **Admin → Discount codes**.
+- [ ] Prepare one customer account that already has a **Delivered** order (so the review and return demos do not require waiting). `customer@luxebag.com` works if you move one of its orders to Delivered.
+- [ ] Send one AI Stylist request yourself to confirm Gemini responds (`GEMINI_API_KEY` is set in `Backend/.env`).
+- [ ] Charge the phone, turn off notifications, and raise the screen brightness.
 
-## Luồng demo
+## Demo flow
 
-| # | Vai trò | Thao tác | Điểm nhấn để nói |
+| # | Role | Action | Talking point |
 |---|---|---|---|
-| 1 | Khách | Mở Home → bấm brand để lọc, nhìn nhãn % off, icon gender, giá giảm dần | Đúng yêu cầu Task 1; dữ liệu từ MockAPI |
-| 2 | Khách | Search → bộ lọc (category + khoảng giá + sắp xếp) | Lọc nâng cao, xem trước số kết quả |
-| 3 | Khách | Mở Detail → xem đánh giá theo sao → thích sản phẩm (tim) | Yêu thích lưu bằng AsyncStorage (Task 3) |
-| 4 | Khách | Add to bag khi chưa đăng nhập → chuyển tới Login | Khách duyệt hàng tự do, cần tài khoản để mua |
-| 5 | Khách | Đăng ký → thêm 2 món vào giỏ → Cart (huy hiệu số lượng) | Giỏ hàng riêng từng tài khoản |
-| 6 | Khách | Checkout: thêm địa chỉ, nhập `SAVE10`, chọn COD, Place order | Kiểm tra tồn kho lúc đặt, giảm giá, phí ship |
-| 7 | Admin | Dashboard thấy "Pending orders" tăng → Orders → mở đơn → Confirm → Shipping → Delivered | Admin điều khiển trạng thái đơn |
-| 8 | Khách | My orders thấy trạng thái đổi; đơn đã Confirmed thì hết nút Cancel | Dữ liệu đồng bộ qua API |
-| 9 | Khách | Detail của món vừa nhận → Write a review | Chỉ khách đã nhận hàng mới đánh giá được |
-| 10 | Admin | Review moderation → ẩn đánh giá | Khách không còn thấy, điểm trung bình đổi |
-| 11 | Khách | Đơn đã giao → Request a return | Quy trình trả hàng trong 7 ngày |
-| 12 | Admin | Dashboard "Return requests" → duyệt & hoàn kho | Hoàn tiền (mô phỏng), tồn kho cộng lại |
-| 13 | Admin | Products → thêm sản phẩm (Draft) → đổi sang Published | Draft không hiện cho khách |
-| 14 | Admin | Sales report → đổi kỳ 7/30/90 ngày | Biểu đồ doanh thu, top sản phẩm |
-| 15 | Khách | (tuỳ thời gian) AI Stylist: "một chiếc túi đi tiệc màu đỏ" | Gemini chọn trong danh mục thật, kết quả được kiểm tra |
-| 16 | Cả hai | Bật chế độ máy bay → mở lại app | Offline: vẫn xem được dữ liệu đã lưu |
+| 1 | Customer | Open Home → tap a brand to filter; point out the % off label, gender icon, and descending price order | Meets Task 1; data comes from our own Express + MongoDB API |
+| 2 | Customer | Search → filters (category + price range + sorting) | Advanced filtering with a live result count |
+| 3 | Customer | Open Detail → read feedback grouped by stars → favorite the product (heart) | Favorites use AsyncStorage for guests and sync to the account after sign-in (Task 3) |
+| 4 | Customer | Tap Add to bag while signed out → redirected to Login | Guests can browse freely; an account is needed to buy |
+| 5 | Customer | Register → add 2 items to the cart → open Cart (badge shows the count) | The cart is per account and synced to the backend |
+| 6 | Customer | Checkout: add an address, enter `SAVE10`, choose COD, Place order | Stock is checked when ordering, coupon applied, $15 shipping (free from $500) |
+| 7 | Admin | Dashboard shows "Pending orders" increase → Orders → open the order → Confirm → Shipping → Delivered | Admin controls the order status |
+| 8 | Customer | My orders shows the new status; once Confirmed, the Cancel button disappears | Data stays in sync through the API |
+| 9 | Customer | Detail of the item just received → Write a review | Only customers who received the item can review it (enforced by the backend) |
+| 10 | Admin | Review moderation → hide the review | The customer no longer sees it and the average rating changes |
+| 11 | Customer | On the delivered order → Request a return | 7-day return process |
+| 12 | Admin | Dashboard "Return requests" → approve (choose whether to restock) | Refund is simulated; stock is added back when restocking is chosen |
+| 13 | Admin | Products → add a product as Draft → switch it to Published | Drafts are hidden from customers |
+| 14 | Admin | Sales report → switch the period between 7 / 30 / 90 days | Revenue chart and top products |
+| 15 | Customer | (if time allows) AI Stylist: "a red bag for a party" | Gemini picks from the real catalog (the app ignores any id that is not in it); the backend falls back to another model if one is overloaded |
+| 16 | Both | Turn on airplane mode → reopen the app | Offline: previously loaded data is still browsable |
 
-Nếu thiếu thời gian: bỏ 2, 10, 13, 15.
+If you are short on time, skip steps 2, 10, 13, and 15.
 
-## Câu hỏi thường gặp khi bảo vệ
+## Frequently asked questions (project defense)
 
-**Vì sao lưu đơn hàng trong `users`?** Gói MockAPI miễn phí chỉ có 2 resource. Đơn nằm trong mảng `orders` của từng tài khoản; admin đọc toàn bộ `users` rồi gom lại. Với backend thật sẽ tách thành bảng `orders`.
+**Why a separate backend instead of a mock API?** Real authentication and server-side rules need a server. The Express API
+hashes passwords with bcrypt, issues JWT tokens, checks roles, and enforces business rules (stock, coupons, who may review)
+so they cannot be bypassed by editing the app. Data is stored in MongoDB.
 
-**Bảo mật mật khẩu thế nào?** Mật khẩu được băm SHA-256 kèm salt riêng, không lưu chữ thô. Nhưng MockAPI không có xác thực, nên đây chỉ là mô phỏng: backend thật cần băm phía server (bcrypt/argon2) và dùng token.
+**How are passwords and sessions secured?** Passwords are hashed with bcrypt on the server and never stored in plain text.
+The app keeps a JWT and sends it as a bearer token; admin endpoints reject non-admin tokens.
 
-**Hai người mua cùng lúc món cuối thì sao?** Không có transaction nên bản ghi sau cùng thắng, có thể sai tồn kho một đơn vị. Đã giảm rủi ro bằng cách luôn kiểm tra lại tồn kho ngay trước khi trừ, và hoàn kho nếu ghi đơn lỗi.
+**What happens if two people buy the last item at the same time?** Stock is reserved with an atomic conditional update
+(`stock >= quantity`), so only one order can take the last unit and the other receives an out-of-stock response. If saving
+an order fails, the reserved stock and coupon use are rolled back.
 
-**Vì sao `percentOff` không làm đổi giá?** Theo dữ liệu đề bài, `cost` là giá bán còn `percentOff` là nhãn hiển thị. Giảm giá thật làm bằng mã giảm giá.
+**Why does `percentOff` sometimes change the price and sometimes not?** `cost` is always the selling price. Admins can apply a
+**real** discount (the price is lowered and the original price is kept) or a **display-only** discount (only the "% off"
+label and original price are shown). Coupons give an extra discount at checkout.
 
-**Thanh toán có thật không?** Không: COD và "thẻ demo" chỉ ghi trạng thái. Hoàn tiền cũng chỉ ghi trạng thái `refunded`.
+**Where is the Gemini API key kept?** Only in `Backend/.env`. The app calls our backend, which calls Gemini, so the key is
+never bundled into the app. If the main model is busy, the backend retries and uses fallback models.
 
-**App chạy offline được không?** Có phần duyệt: danh sách sản phẩm được lưu trên máy và hiện ngay khi mở app; đặt hàng cần mạng.
+**Is the payment real?** No. COD and the "demo card" only record a status. Refunds also only set the status to `refunded`.
 
-**Làm sao đảm bảo chất lượng?** `node tests/run.js` chạy 4 bộ kiểm thử logic và 82 kiểm tra giao diện (render từng màn, mô phỏng bấm nút) với MockAPI giả.
+**Does the app work offline?** Browsing does: the product list is saved on the device and shown immediately when the app
+opens. Placing orders and other writes need a connection.
 
-## Nếu có sự cố khi demo
+**How was quality checked?** Mainly by manual testing of the full flow above on a real device. The automated tests in
+`tests/` were written for the earlier MockAPI version and need to be rewritten for the Express backend; we list this as a
+known limitation.
 
-| Sự cố | Cách xử lý nhanh |
+## If something goes wrong during the demo
+
+| Problem | Quick fix |
 |---|---|
-| Mất mạng | Giải thích đây là chế độ offline; chuyển sang demo phần duyệt / yêu thích |
-| Màn hình trắng | Lắc máy → Reload; nếu vẫn lỗi: `npx expo start -c` |
-| Đơn không hiện bên admin | Kéo xuống để làm mới (dữ liệu admin cache 15 giây) |
-| AI Stylist báo lỗi | Kiểm tra `GEMINI_API_KEY` trong `Backend/.env`; bỏ qua mục này và demo phần còn lại |
+| App cannot connect / endless loading | Check that the backend is running and the phone is on the same Wi-Fi. Confirm `EXPO_PUBLIC_BACKEND_URL` has the computer's current IP, then restart with `npx expo start -c`. |
+| No network | Explain this is offline mode; switch to browsing and favorites |
+| Blank screen | Shake the device → Reload; if it persists, run `npx expo start -c` |
+| An order does not show on the admin side | Pull down to refresh (admin data is cached for 15 seconds) |
+| AI Stylist shows "not configured" | `GEMINI_API_KEY` is missing from `Backend/.env`; add it and restart the backend |
+| AI Stylist shows "Gemini is having trouble" | Google is busy. Tap "Try again" once; if it still fails, skip this step and continue with the rest |
+| Login fails for a seeded account | Run `npm run seed` again in `Backend/`, then retry |
