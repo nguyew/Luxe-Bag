@@ -19,6 +19,7 @@ import { formatBrand, formatPrice } from '../utils/format';
 import {
   RETURN_STATUS,
   STATUS_ACTION_LABEL,
+  formatOrderCode,
   formatOrderDate,
   nextStatuses,
   paymentLabel,
@@ -119,8 +120,8 @@ export default function AdminOrderDetailScreen({ route }) {
     >
       <View style={styles.card}>
         <View style={styles.headRow}>
-          <View>
-            <Text style={styles.orderId}>{order.id}</Text>
+          <View style={styles.headText}>
+            <Text style={styles.orderId} numberOfLines={1}>{formatOrderCode(order.id)}</Text>
             <Text style={styles.date}>{formatOrderDate(order.createdAt)}</Text>
           </View>
           <OrderStatusBadge status={order.status} />
@@ -344,7 +345,8 @@ const styles = StyleSheet.create({
     color: '#77716A',
   },
   card: { padding: 16, borderRadius: 24, backgroundColor: '#FFFFFF' },
-  headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  headText: { flexShrink: 1 },
   orderId: { fontSize: 16, fontWeight: '800', letterSpacing: 0.3, color: '#0D0D0D' },
   date: { marginTop: 2, fontSize: 12, color: '#77716A' },
 
