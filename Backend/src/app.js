@@ -4,7 +4,9 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const passport = require('./config/passport');
 const swaggerUi = require('swagger-ui-express');
-const { nodeEnv } = require('./config/env');
+const { allowedOrigins, nodeEnv } = require('./config/env');
+const asyncHandler = require('./middleware/asyncHandler');
+const { stripeWebhook } = require('./controllers/paymentController');
 const swaggerDocument = require('./config/swagger');
 const adminRoutes = require('./routes/adminRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -16,13 +18,41 @@ const couponRoutes = require('./routes/couponRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const favoriteRoutes = require('./routes/favoriteRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const catalogRoutes = require('./routes/catalogRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
 
 app.disable('x-powered-by');
 app.use(helmet());
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || (nodeEnv !== 'production' && !allowedOrigins.length)) {
+      return callback(null, true);
+    }
+    const error = new Error('Origin is not allowed by CORS.');
+    error.statusCode = 403;
+    return callback(error);
+  },
+}));
+
+// Stripe requires the exact raw request body to verify the webhook signature.
+// This endpoint must stay before express.json().
+/**
+ * @swagger
+ * /api/payments/stripe/webhook:
+ *   post:
+ *     tags: [Payments]
+ *     summary: Receive signed Stripe payment and refund events
+ *     responses:
+ *       200: { description: Event accepted }
+ *       400: { description: Invalid webhook signature }
+ */
+app.post(
+  '/api/payments/stripe/webhook',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  asyncHandler(stripeWebhook)
+);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(nodeEnv === 'production' ? 'combined' : 'dev'));
@@ -50,6 +80,7 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/catalog', catalogRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

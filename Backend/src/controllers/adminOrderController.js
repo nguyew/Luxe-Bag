@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
-const Product = require('../models/Product');
+const { cancelPaymentIntent } = require('../services/stripeService');
+const { refundOrderPayment } = require('../services/orderPaymentService');
+const { releaseOrderResources } = require('../services/orderResourceService');
 
 const NEXT_STATUSES = {
   pending: ['confirmed', 'cancelled'],
@@ -53,18 +55,38 @@ const updateAdminOrderStatus = async (req, res) => {
     return res.status(409).json({ error: 'Invalid order status transition.', code: 'invalid_transition' });
   }
 
-  const now = new Date();
-  if (status === 'cancelled') {
-    // Only return stock after the status transition has been accepted.
-    await Promise.all(order.items.map((item) => Product.updateOne({ _id: item.productId }, { $inc: { stock: item.qty } })));
-    order.cancelledAt = now;
-    if (order.paymentStatus === 'paid') order.paymentStatus = 'refunded';
+  if (order.paymentMethod === 'card' && status !== 'cancelled' && order.paymentStatus !== 'paid') {
+    return res.status(409).json({
+      error: 'Card payment has not completed.',
+      code: 'payment_required',
+    });
   }
-  if (status === 'delivered' && order.paymentMethod === 'cod') order.paymentStatus = 'paid';
+
+  const now = new Date();
+  let shouldReleaseResources = false;
+  if (status === 'cancelled') {
+    if (order.paymentStatus === 'processing') {
+      return res.status(409).json({
+        error: 'The payment is processing and the order cannot be cancelled yet.',
+        code: 'payment_processing',
+      });
+    }
+    if (order.paymentMethod === 'card' && order.paymentStatus === 'requires_payment') {
+      await cancelPaymentIntent(order);
+    }
+    await refundOrderPayment(order);
+    order.cancelledAt = now;
+    shouldReleaseResources = true;
+  }
+  if (status === 'delivered' && order.paymentMethod === 'cod') {
+    order.paymentStatus = 'paid';
+    order.paymentCompletedAt = now;
+  }
   order.status = status;
   order.history.push({ status, at: now });
   await order.save();
-  return res.json({ order: serializeOrder(order) });
+  if (shouldReleaseResources) await releaseOrderResources(order);
+  return res.json({ order: serializeOrder(await Order.findById(order._id)) });
 };
 
 const resolveAdminReturn = async (req, res) => {
@@ -78,20 +100,19 @@ const resolveAdminReturn = async (req, res) => {
 
   const now = new Date();
   const approved = decision === 'approve';
+  const shouldRestock = approved && restock === true;
   order.returnRequest.status = approved ? 'approved' : 'rejected';
   order.returnRequest.resolvedAt = now;
   order.returnRequest.adminNote = String(note || '').trim().slice(0, 300);
   order.returnRequest.restocked = approved && restock === true;
   if (approved) {
+    await refundOrderPayment(order);
     order.status = 'returned';
-    if (order.paymentStatus === 'paid') order.paymentStatus = 'refunded';
     order.history.push({ status: 'returned', at: now });
-    if (restock === true) {
-      await Promise.all(order.items.map((item) => Product.updateOne({ _id: item.productId }, { $inc: { stock: item.qty } })));
-    }
   }
   await order.save();
-  return res.json({ order: serializeOrder(order) });
+  if (shouldRestock) await releaseOrderResources(order);
+  return res.json({ order: serializeOrder(await Order.findById(order._id)) });
 };
 
 module.exports = { listAdminOrders, updateAdminOrderStatus, resolveAdminReturn };
