@@ -9,6 +9,22 @@ const swaggerDefinition = {
     description: 'Authentication, catalog, shopping, and administration API for LuxeBag.',
   },
   servers: [{ url: '/' }],
+  tags: [
+    { name: 'Authentication' },
+    { name: 'Admin - Coupons' },
+    { name: 'Admin - Customers' },
+    { name: 'Admin - Orders' },
+    { name: 'Admin - Products' },
+    { name: 'Admin - Reviews' },
+    { name: 'AI Stylist' },
+    { name: 'Cart' },
+    { name: 'Coupons' },
+    { name: 'Favorites' },
+    { name: 'Orders' },
+    { name: 'Products' },
+    { name: 'Reviews' },
+    { name: 'System' },
+  ],
   components: {
     securitySchemes: {
       bearerAuth: {

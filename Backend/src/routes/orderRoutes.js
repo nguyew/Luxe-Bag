@@ -73,6 +73,27 @@ router.get('/my', asyncHandler(listMyOrders));
  */
 // Must stay above '/:id', otherwise Express would treat "purchased" as an order id.
 router.get('/purchased', asyncHandler(listPurchasedBags));
+/**
+ * @swagger
+ * /api/orders/{id}:
+ *   get:
+ *     tags: [Orders]
+ *     summary: Get one of the authenticated customer's orders
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Customer order
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 order: { $ref: '#/components/schemas/Order' }
+ *       400: { description: Invalid order id }
+ *       404: { description: Order not found }
+ */
 router.get('/:id', asyncHandler(getMyOrder));
 /**
  * @swagger

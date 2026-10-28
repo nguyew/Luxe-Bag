@@ -137,6 +137,20 @@ router.get('/reviews', asyncHandler(listAdminReviews));
  *       404: { description: Review not found }
  */
 router.patch('/reviews/:reviewId/moderation', asyncHandler(moderateReview));
+/**
+ * @swagger
+ * /api/admin/reviews/{reviewId}:
+ *   delete:
+ *     tags: [Admin - Reviews]
+ *     summary: Delete a product review
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: reviewId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Review deleted }
+ *       400: { description: Invalid review id }
+ *       404: { description: Review not found }
+ */
 router.delete('/reviews/:reviewId', asyncHandler(deleteAdminReview));
 /**
  * @swagger
