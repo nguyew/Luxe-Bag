@@ -18,7 +18,7 @@ import SearchBox from '../components/SearchBox';
 import useAdminUsers from '../hooks/useAdminUsers';
 import { flattenOrders, orderCountsByStatus, returnRequestCount } from '../utils/admin';
 import { formatPrice } from '../utils/format';
-import { ORDER_STATUS, formatOrderDate, hasOpenReturn } from '../utils/orders';
+import { ORDER_STATUS, formatOrderCode, formatOrderDate, hasOpenReturn } from '../utils/orders';
 
 /** Tất cả đơn hàng của mọi khách: tìm theo mã/khách, lọc theo trạng thái. */
 export default function AdminOrdersScreen({ navigation, route }) {
@@ -62,6 +62,7 @@ export default function AdminOrdersScreen({ navigation, route }) {
         (order) =>
           !text ||
           String(order.id).toLowerCase().includes(text) ||
+          formatOrderCode(order.id).toLowerCase().includes(text) ||
           String(order.customerName || '').toLowerCase().includes(text) ||
           String(order.customerEmail || '').toLowerCase().includes(text)
       );
@@ -137,11 +138,11 @@ const OrderRow = React.memo(function OrderRow({ order, onPress }) {
       onPress={() => onPress(order)}
       style={styles.card}
       accessibilityRole="button"
-      accessibilityLabel={`Order ${order.id} from ${order.customerName}`}
+      accessibilityLabel={`Order ${formatOrderCode(order.id)} from ${order.customerName}`}
     >
       <View style={styles.top}>
         <View style={styles.topText}>
-          <Text style={styles.orderId}>{order.id}</Text>
+          <Text style={styles.orderId}>{formatOrderCode(order.id)}</Text>
           <Text style={styles.customer} numberOfLines={1}>
             {order.customerName} · {formatOrderDate(order.createdAt)}
           </Text>

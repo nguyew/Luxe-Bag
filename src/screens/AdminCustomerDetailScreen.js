@@ -14,7 +14,7 @@ import useAdminUsers from '../hooks/useAdminUsers';
 import { setCustomerStatus } from '../services/adminService';
 import { customerStats } from '../utils/admin';
 import { formatPrice } from '../utils/format';
-import { formatOrderDate } from '../utils/orders';
+import { formatOrderCode, formatOrderDate } from '../utils/orders';
 
 /** Hồ sơ một khách hàng: thông tin, thống kê, đơn hàng và trạng thái tài khoản. */
 export default function AdminCustomerDetailScreen({ navigation, route }) {
@@ -152,10 +152,10 @@ export default function AdminCustomerDetailScreen({ navigation, route }) {
             }
             style={[styles.card, styles.orderCard]}
             accessibilityRole="button"
-            accessibilityLabel={`Order ${order.id}`}
+            accessibilityLabel={`Order ${formatOrderCode(order.id)}`}
           >
             <View style={styles.orderText}>
-              <Text style={styles.orderId}>{order.id}</Text>
+              <Text style={styles.orderId}>{formatOrderCode(order.id)}</Text>
               <Text style={styles.orderDate}>{formatOrderDate(order.createdAt)}</Text>
             </View>
             <View style={styles.orderRight}>

@@ -16,7 +16,7 @@ import SignInPrompt from '../components/SignInPrompt';
 import useAuth from '../hooks/useAuth';
 import { describeOrderError, getMyOrders } from '../services/orderService';
 import { formatPrice } from '../utils/format';
-import { formatOrderDate } from '../utils/orders';
+import { formatOrderCode, formatOrderDate } from '../utils/orders';
 
 /** Danh sách đơn hàng của tôi (mới nhất trước). */
 export default function OrdersScreen({ navigation }) {
@@ -141,11 +141,11 @@ const OrderRow = React.memo(function OrderRow({ order, onPress }) {
       onPress={() => onPress(order)}
       style={styles.card}
       accessibilityRole="button"
-      accessibilityLabel={`Order ${order.id}`}
+      accessibilityLabel={`Order ${formatOrderCode(order.id)}`}
     >
       <View style={styles.cardTop}>
         <View>
-          <Text style={styles.orderId}>{order.id}</Text>
+          <Text style={styles.orderId}>{formatOrderCode(order.id)}</Text>
           <Text style={styles.date}>{formatOrderDate(order.createdAt)}</Text>
         </View>
         <OrderStatusBadge status={order.status} />

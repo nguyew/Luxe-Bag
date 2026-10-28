@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const Coupon = require('../models/Coupon');
+const Review = require('../models/Review');
 
 const SHIPPING_FEE = 15;
 const FREE_SHIPPING_THRESHOLD = 500;
@@ -165,6 +166,101 @@ const listMyOrders = async (req, res) => {
   return res.json({ orders: orders.map(serializeOrder) });
 };
 
+const toIso = (value) => (value instanceof Date ? value.toISOString() : value);
+
+/**
+ * Bags the customer has purchased successfully.
+ * A purchase counts once its order is `delivered`; cancelled, returned, and
+ * still-in-progress orders are excluded. Orders are grouped per product so a bag
+ * bought several times appears once, with how many were bought and the totals.
+ */
+const listPurchasedBags = async (req, res) => {
+  const orders = await Order.find({ userId: req.user._id, status: 'delivered' }).sort({ createdAt: -1 });
+
+  const grouped = new Map();
+  for (const order of orders) {
+    const raw = order.toObject();
+    const deliveredEntry = [...(raw.history || [])].reverse().find((entry) => entry.status === 'delivered');
+    const purchasedAt = toIso(deliveredEntry?.at || raw.updatedAt || raw.createdAt);
+    const orderId = asId(raw._id);
+
+    for (const item of raw.items || []) {
+      const productId = asId(item.productId) || item.handbagId;
+      const lineTotal = round2(Number(item.unitPrice) * Number(item.qty));
+      const existing = grouped.get(productId);
+      if (!existing) {
+        grouped.set(productId, {
+          id: productId,
+          productId,
+          name: item.name,
+          brand: item.brand || '',
+          uri: item.uri || '',
+          unitPrice: item.unitPrice,
+          quantity: item.qty,
+          ordersCount: 1,
+          totalSpent: lineTotal,
+          firstPurchasedAt: purchasedAt,
+          lastPurchasedAt: purchasedAt,
+          lastOrderId: orderId,
+          orderIds: [orderId],
+        });
+        continue;
+      }
+      existing.quantity += item.qty;
+      existing.totalSpent = round2(existing.totalSpent + lineTotal);
+      if (!existing.orderIds.includes(orderId)) {
+        existing.orderIds.push(orderId);
+        existing.ordersCount += 1;
+      }
+      if (new Date(purchasedAt) > new Date(existing.lastPurchasedAt)) {
+        // Newest purchase wins for the snapshot shown to the customer.
+        Object.assign(existing, {
+          name: item.name,
+          brand: item.brand || '',
+          uri: item.uri || existing.uri,
+          unitPrice: item.unitPrice,
+          lastPurchasedAt: purchasedAt,
+          lastOrderId: orderId,
+        });
+      }
+      if (new Date(purchasedAt) < new Date(existing.firstPurchasedAt)) existing.firstPurchasedAt = purchasedAt;
+    }
+  }
+
+  const productIds = [...grouped.keys()].filter((id) => mongoose.isValidObjectId(id));
+  const [products, reviews] = productIds.length
+    ? await Promise.all([
+      Product.find({ _id: { $in: productIds } }).select('handbagName cost stock status'),
+      Review.find({ userId: req.user._id, productId: { $in: productIds } }).select('productId rating hidden'),
+    ])
+    : [[], []];
+  const productById = new Map(products.map((product) => [asId(product._id), product]));
+  const reviewByProduct = new Map(reviews.map((review) => [asId(review.productId), review]));
+
+  const bags = [...grouped.values()]
+    .map((bag) => {
+      const product = productById.get(bag.productId);
+      const review = reviewByProduct.get(bag.productId);
+      return {
+        ...bag,
+        // Live catalog state, so the app can offer "buy again" only when it is possible.
+        available: Boolean(product && product.status === 'published' && Number(product.stock) > 0),
+        currentPrice: product ? product.cost : null,
+        myReview: review ? { rating: review.rating, hidden: review.hidden === true } : null,
+      };
+    })
+    .sort((a, b) => new Date(b.lastPurchasedAt) - new Date(a.lastPurchasedAt));
+
+  return res.json({
+    summary: {
+      bags: bags.length,
+      items: bags.reduce((sum, bag) => sum + bag.quantity, 0),
+      totalSpent: round2(bags.reduce((sum, bag) => sum + bag.totalSpent, 0)),
+    },
+    bags,
+  });
+};
+
 const getMyOrder = async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid order id.' });
   const order = await Order.findOne({ _id: req.params.id, userId: req.user._id });
@@ -215,4 +311,4 @@ const requestReturn = async (req, res) => {
   return res.status(201).json({ order: serializeOrder(order) });
 };
 
-module.exports = { cancelMyOrder, createOrder, getMyOrder, listMyOrders, requestReturn };
+module.exports = { cancelMyOrder, createOrder, getMyOrder, listMyOrders, listPurchasedBags, requestReturn };

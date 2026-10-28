@@ -202,6 +202,48 @@ const swaggerDefinition = {
           contentType: { type: 'string', enum: ['image/jpeg', 'image/png', 'image/webp'] },
         },
       },
+      PurchasedBag: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Product id', example: '6712f0c9e4b1f6a2d8c12345' },
+          productId: { type: 'string', example: '6712f0c9e4b1f6a2d8c12345' },
+          name: { type: 'string', example: 'Tabby Shoulder Bag 26' },
+          brand: { type: 'string', example: 'Coach' },
+          uri: { type: 'string', format: 'uri' },
+          unitPrice: { type: 'number', description: 'Price paid per bag at the latest purchase', example: 8900000 },
+          quantity: { type: 'integer', description: 'Total bags bought across delivered orders', example: 1 },
+          ordersCount: { type: 'integer', example: 1 },
+          totalSpent: { type: 'number', description: 'Sum of unitPrice x qty (before order-level discounts and shipping)', example: 8900000 },
+          firstPurchasedAt: { type: 'string', format: 'date-time' },
+          lastPurchasedAt: { type: 'string', format: 'date-time' },
+          lastOrderId: { type: 'string' },
+          orderIds: { type: 'array', items: { type: 'string' } },
+          available: { type: 'boolean', description: 'Still published and in stock, so it can be bought again' },
+          currentPrice: { type: 'number', nullable: true, description: 'Current catalog price, null if the product was removed' },
+          myReview: {
+            type: 'object',
+            nullable: true,
+            properties: {
+              rating: { type: 'integer', minimum: 1, maximum: 5 },
+              hidden: { type: 'boolean' },
+            },
+          },
+        },
+      },
+      PurchasedBagsResponse: {
+        type: 'object',
+        properties: {
+          summary: {
+            type: 'object',
+            properties: {
+              bags: { type: 'integer', description: 'Distinct bags', example: 2 },
+              items: { type: 'integer', description: 'Total quantity', example: 3 },
+              totalSpent: { type: 'number', example: 16100000 },
+            },
+          },
+          bags: { type: 'array', items: { $ref: '#/components/schemas/PurchasedBag' } },
+        },
+      },
       ImageUploadResponse: {
         type: 'object',
         properties: {
