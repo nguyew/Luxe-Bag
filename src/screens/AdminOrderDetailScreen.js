@@ -19,6 +19,7 @@ import { formatBrand, formatPrice } from '../utils/format';
 import {
   RETURN_STATUS,
   STATUS_ACTION_LABEL,
+  formatOrderCode,
   formatOrderDate,
   nextStatuses,
   paymentLabel,
@@ -93,24 +94,6 @@ export default function AdminOrderDetailScreen({ route }) {
     );
   };
 
-  const confirmChange = (nextStatus) => {
-    const cancelling = nextStatus === 'cancelled';
-    Alert.alert(
-      `${STATUS_ACTION_LABEL[nextStatus]}?`,
-      cancelling
-        ? 'The customer will see the order as cancelled and the items go back into stock.'
-        : `The customer will see this order as ${nextStatus}.`,
-      [
-        { text: 'Back', style: 'cancel' },
-        {
-          text: STATUS_ACTION_LABEL[nextStatus],
-          style: cancelling ? 'destructive' : 'default',
-          onPress: () => change(nextStatus),
-        },
-      ]
-    );
-  };
-
   return (
     <ScrollView
       style={styles.screen}
@@ -119,8 +102,8 @@ export default function AdminOrderDetailScreen({ route }) {
     >
       <View style={styles.card}>
         <View style={styles.headRow}>
-          <View>
-            <Text style={styles.orderId}>{order.id}</Text>
+          <View style={styles.headText}>
+            <Text style={styles.orderId} numberOfLines={1}>{formatOrderCode(order.id)}</Text>
             <Text style={styles.date}>{formatOrderDate(order.createdAt)}</Text>
           </View>
           <OrderStatusBadge status={order.status} />
@@ -135,7 +118,7 @@ export default function AdminOrderDetailScreen({ route }) {
             return (
               <Pressable
                 key={next}
-                onPress={() => confirmChange(next)}
+                onPress={() => change(next)}
                 disabled={busy !== null}
                 style={[
                   styles.action,
@@ -143,6 +126,7 @@ export default function AdminOrderDetailScreen({ route }) {
                   busy !== null && styles.actionBusy,
                 ]}
                 accessibilityRole="button"
+                accessibilityLabel={STATUS_ACTION_LABEL[next]}
               >
                 {busy === next ? (
                   <ActivityIndicator color={cancel ? '#B3261E' : '#FFFFFF'} />
@@ -344,7 +328,8 @@ const styles = StyleSheet.create({
     color: '#77716A',
   },
   card: { padding: 16, borderRadius: 24, backgroundColor: '#FFFFFF' },
-  headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  headText: { flexShrink: 1 },
   orderId: { fontSize: 16, fontWeight: '800', letterSpacing: 0.3, color: '#0D0D0D' },
   date: { marginTop: 2, fontSize: 12, color: '#77716A' },
 

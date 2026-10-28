@@ -82,6 +82,19 @@ export function generateOrderId() {
   return `LB-${time}${rand}`;
 }
 
+/**
+ * Short, readable order code for screens, e.g. "LB-B9DE3C24".
+ * The database id is a 24-character ObjectId: too long to display. The last 8 characters change
+ * with every order, so they are enough to tell orders apart (and to search for in Admin).
+ * Ids that already start with "LB-" (older local orders) are returned unchanged.
+ */
+export function formatOrderCode(id) {
+  const raw = String(id ?? '').trim();
+  if (!raw) return '';
+  if (/^LB-/i.test(raw)) return raw.toUpperCase();
+  return `LB-${raw.slice(-8).toUpperCase()}`;
+}
+
 export function formatOrderDate(iso) {
   const time = Date.parse(iso);
   if (Number.isNaN(time)) return '';

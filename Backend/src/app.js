@@ -31,7 +31,15 @@ app.use(passport.initialize());
 app.get('/', (req, res) => {
   res.json({ name: 'LuxeBag API', status: 'ok' });
 });
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocument, {
+    swaggerOptions: {
+      operationsSorter: 'alpha',
+    },
+  })
+);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);

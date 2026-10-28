@@ -30,6 +30,7 @@ import AddressesScreen from '../screens/AddressesScreen';
 import AddressFormScreen from '../screens/AddressFormScreen';
 import OrdersScreen from '../screens/OrdersScreen';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
+import PurchasedBagsScreen from '../screens/PurchasedBagsScreen';
 import { getSnapshot as getCartSnapshot, subscribe as subscribeCart } from '../services/cartService';
 import useAuth from '../hooks/useAuth';
 
@@ -292,6 +293,11 @@ export default function AppNavigator() {
             name="OrderDetail"
             component={OrderDetailScreen}
             options={{ title: 'Order Details', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="PurchasedBags"
+            component={PurchasedBagsScreen}
+            options={{ title: 'Purchased Bags', ...detailHeader }}
           />
           <Stack.Screen
             name="ReviewForm"

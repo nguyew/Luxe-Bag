@@ -193,11 +193,12 @@ export default function ProfileScreen({ navigation }) {
     }
   }, [nameDraft, user, updateAccount]);
 
-  const confirmLogout = () => {
-    Alert.alert('Sign out?', 'You can sign back in anytime.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => logout() },
-    ]);
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      Alert.alert('Unable to sign out', 'Please try again.');
+    }
   };
 
   // Khách chưa đăng nhập
@@ -335,8 +336,41 @@ export default function ProfileScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={18} color="#9A948D" />
         </Pressable>
 
+        {/* Đơn hàng & các túi đã mua */}
         <Pressable
-          onPress={confirmLogout}
+          onPress={() => navigation.navigate('Orders')}
+          style={[styles.card, styles.favoritesRow]}
+          accessibilityRole="button"
+          accessibilityLabel="My orders"
+        >
+          <View style={[styles.favoritesIcon, styles.menuIcon]}>
+            <Ionicons name="receipt-outline" size={18} color="#1A1A1A" />
+          </View>
+          <View style={styles.favoritesText}>
+            <Text style={styles.favoritesTitle}>My orders</Text>
+            <Text style={styles.favoritesCount}>Track, cancel or return an order</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9A948D" />
+        </Pressable>
+
+        <Pressable
+          onPress={() => navigation.navigate('PurchasedBags')}
+          style={[styles.card, styles.favoritesRow]}
+          accessibilityRole="button"
+          accessibilityLabel="Purchased bags"
+        >
+          <View style={[styles.favoritesIcon, styles.menuIcon]}>
+            <Ionicons name="bag-check-outline" size={18} color="#1A1A1A" />
+          </View>
+          <View style={styles.favoritesText}>
+            <Text style={styles.favoritesTitle}>Purchased bags</Text>
+            <Text style={styles.favoritesCount}>Bags you have received</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9A948D" />
+        </Pressable>
+
+        <Pressable
+          onPress={handleLogout}
           style={styles.logoutButton}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
@@ -459,6 +493,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDE9EB',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  menuIcon: {
+    backgroundColor: '#EFEBE7',
   },
   favoritesText: {
     flex: 1,

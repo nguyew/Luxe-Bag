@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import useAuth from '../hooks/useAuth';
 import { describeOrderError, requestReturn } from '../services/orderService';
-import { RETURN_REASONS, RETURN_WINDOW_DAYS, returnDeadline } from '../utils/orders';
+import { RETURN_REASONS, RETURN_WINDOW_DAYS, formatOrderCode, returnDeadline } from '../utils/orders';
 
 /** Khách gửi yêu cầu trả hàng cho một đơn đã giao. */
 export default function ReturnRequestScreen({ navigation, route }) {
@@ -66,7 +66,7 @@ export default function ReturnRequestScreen({ navigation, route }) {
           <Text style={styles.infoText}>
             Returns are accepted within {RETURN_WINDOW_DAYS} days of delivery
             {deadline ? ` (until ${new Date(deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : ''}.
-            If approved, the whole order {order.id} is refunded.
+            If approved, the whole order {formatOrderCode(order.id)} is refunded.
           </Text>
         </View>
 
