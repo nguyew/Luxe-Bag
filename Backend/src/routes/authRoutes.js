@@ -1,77 +1,67 @@
-const express = require('express');
-const asyncHandler = require('../middleware/asyncHandler');
-const authenticate = require('../middleware/authenticate');
-const { getCurrentUser, updateCurrentUser, updateAvatar, deleteAvatar, login, register } = require('../controllers/authController');
+const express = require("express");
+const { rateLimit } = require("express-rate-limit");
+const asyncHandler = require("../middleware/asyncHandler");
+const authenticate = require("../middleware/authenticate");
+const {
+  getCurrentUser,
+  updateCurrentUser,
+  updateAvatar,
+  deleteAvatar,
+  login,
+} = require("../controllers/authController");
+const {
+  register,
+  resendVerification,
+  verifyEmail,
+} = require("../controllers/registrationController");
 
 const router = express.Router();
 
-/**
- * @swagger
- * /api/auth/register:
- *   post:
- *     tags: [Authentication]
- *     summary: Register a customer account
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/RegisterRequest'
- *     responses:
- *       201:
- *         description: Account created and JWT issued
- *       400:
- *         description: Invalid input
- *       409:
- *         description: Email is already registered
- */
-router.post('/register', asyncHandler(register));
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "Too many authentication attempts. Please try again later.",
+    code: "rate_limited",
+  },
+});
 
-/**
- * @swagger
- * /api/auth/login:
- *   post:
- *     tags: [Authentication]
- *     summary: Sign in with email and password
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/LoginRequest'
- *     responses:
- *       200:
- *         description: JWT issued
- *       401:
- *         description: Invalid credentials
- */
-router.post('/login', asyncHandler(login));
+const resendLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: {
+    error: "Too many verification requests. Please try again later.",
+    code: "rate_limited",
+  },
+});
 
-/**
- * @swagger
- * /api/auth/me:
- *   get:
- *     tags: [Authentication]
- *     summary: Get the authenticated user
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Current user
- *       401:
- *         description: Missing or invalid JWT
- */
-router.route('/me')
+router.post("/register", authLimiter, asyncHandler(register));
+router.post("/verify-email", authLimiter, asyncHandler(verifyEmail));
+router.post(
+  "/resend-verification",
+  resendLimiter,
+  asyncHandler(resendVerification),
+);
+router.post("/login", authLimiter, asyncHandler(login));
+
+router
+  .route("/me")
   .get(authenticate, getCurrentUser)
   .patch(authenticate, asyncHandler(updateCurrentUser));
 
-// Raw image uploads bypass JSON parsing and are stored in Backblaze B2.
 router.put(
-  '/me/avatar',
+  "/me/avatar",
   authenticate,
-  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
-  asyncHandler(updateAvatar)
+  express.raw({
+    type: ["image/jpeg", "image/png", "image/webp"],
+    limit: "5mb",
+  }),
+  asyncHandler(updateAvatar),
 );
-router.delete('/me/avatar', authenticate, asyncHandler(deleteAvatar));
+router.delete("/me/avatar", authenticate, asyncHandler(deleteAvatar));
 
 module.exports = router;
