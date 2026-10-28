@@ -1,4 +1,5 @@
 const { geminiApiKey, geminiModel, geminiFallbackModels } = require('../config/env');
+const Product = require('../models/Product');
 
 const MAX_REQUEST_LENGTH = 300;
 const MAX_CATALOG_ITEMS = 60;
@@ -70,14 +71,19 @@ async function askStylist(req, res) {
   }
 
   const request = sanitizeRequest(req.body?.request);
-  const rawCatalog = req.body?.handbags;
   if (!request) return res.status(400).json({ error: 'Please enter a request.' });
-  if (!Array.isArray(rawCatalog)) return res.status(400).json({ error: 'A product catalog is required.' });
 
-  const catalog = rawCatalog.slice(0, MAX_CATALOG_ITEMS)
-    .filter((item) => item && typeof item === 'object' && item.id != null)
-    .map(normalizeCatalogEntry);
-  if (!catalog.length) return res.status(400).json({ error: 'The product catalog is empty.' });
+  const rawCatalog = await Product.find({ status: 'published', stock: { $gt: 0 } })
+    .sort({ createdAt: -1 })
+    .limit(MAX_CATALOG_ITEMS)
+    .lean();
+  const catalog = rawCatalog.map((item) => normalizeCatalogEntry({
+    ...item,
+    id: String(item._id),
+  }));
+  if (!catalog.length) {
+    return res.status(409).json({ error: 'No published products are available.', code: 'empty_catalog' });
+  }
 
   const prompt = [
     'You are the AI Stylist for LuxeBag, a luxury handbag shop.',

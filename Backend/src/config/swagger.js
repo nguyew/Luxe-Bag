@@ -5,22 +5,26 @@ const swaggerDefinition = {
   openapi: '3.0.3',
   info: {
     title: 'LuxeBag API',
-    version: '1.1.0',
+    version: '1.2.0',
     description: 'Authentication, catalog, shopping, and administration API for LuxeBag.',
   },
   servers: [{ url: '/' }],
   tags: [
     { name: 'Authentication' },
     { name: 'Admin - Coupons' },
+    { name: 'Admin - Catalog' },
     { name: 'Admin - Customers' },
     { name: 'Admin - Orders' },
     { name: 'Admin - Products' },
     { name: 'Admin - Reviews' },
+    { name: 'Admin - Reports' },
     { name: 'AI Stylist' },
     { name: 'Cart' },
+    { name: 'Catalog' },
     { name: 'Coupons' },
     { name: 'Favorites' },
     { name: 'Orders' },
+    { name: 'Payments' },
     { name: 'Products' },
     { name: 'Reviews' },
     { name: 'System' },
@@ -68,7 +72,7 @@ const swaggerDefinition = {
         type: 'object',
         properties: {
           id: { type: 'string', readOnly: true },
-          status: { type: 'string', enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned', 'refunded'] },
+          status: { type: 'string', enum: ['pending', 'confirmed', 'shipping', 'delivered', 'cancelled', 'returned'] },
           items: { type: 'array', items: { $ref: '#/components/schemas/OrderItem' } },
           subtotal: { type: 'number', format: 'double' },
           discount: { type: 'number', format: 'double' },
@@ -76,7 +80,12 @@ const swaggerDefinition = {
           total: { type: 'number', format: 'double' },
           address: { $ref: '#/components/schemas/Address' },
           paymentMethod: { type: 'string', enum: ['cod', 'card'] },
-          paymentStatus: { type: 'string', enum: ['unpaid', 'paid'] },
+          paymentStatus: { type: 'string', enum: ['unpaid', 'requires_payment', 'processing', 'paid', 'failed', 'refunded'] },
+          paymentProvider: { type: 'string', enum: ['cod', 'stripe'] },
+          paymentIntentId: { type: 'string', nullable: true, readOnly: true },
+          paymentExpiresAt: { type: 'string', format: 'date-time', nullable: true },
+          refundId: { type: 'string', nullable: true, readOnly: true },
+          refundStatus: { type: 'string', enum: ['none', 'pending', 'succeeded', 'failed', 'canceled'] },
           couponCode: { type: 'string', nullable: true },
           returnRequest: { type: 'object', nullable: true, additionalProperties: true },
           createdAt: { type: 'string', format: 'date-time' },
@@ -120,10 +129,9 @@ const swaggerDefinition = {
       },
       StylistRequest: {
         type: 'object',
-        required: ['request', 'handbags'],
+        required: ['request'],
         properties: {
-          request: { type: 'string', minLength: 1, maxLength: 1000 },
-          handbags: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          request: { type: 'string', minLength: 1, maxLength: 300 },
         },
       },
       RegisterRequest: {
@@ -182,6 +190,7 @@ const swaggerDefinition = {
           gender: { type: 'boolean', example: true },
           stock: { type: 'integer', minimum: 0, example: 20 },
           status: { type: 'string', enum: ['draft', 'published', 'archived'], example: 'published' },
+          images: { type: 'array', items: { $ref: '#/components/schemas/ProductImage' } },
           uri: { type: 'string', format: 'uri', example: 'https://f005.backblazeb2.com/file/luxe-bag/products/example.jpeg' },
           imageKey: { type: 'string', example: 'products/example.jpeg' },
           createdAt: { type: 'string', format: 'date-time', readOnly: true },
@@ -210,6 +219,28 @@ const swaggerDefinition = {
       ProductUpdateRequest: {
         allOf: [{ $ref: '#/components/schemas/ProductCreateRequest' }],
         minProperties: 1,
+      },
+      ProductImage: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', readOnly: true },
+          url: { type: 'string', format: 'uri' },
+          key: { type: 'string', example: 'products/example.jpeg' },
+          alt: { type: 'string', maxLength: 160 },
+          sortOrder: { type: 'integer', minimum: 0 },
+          isPrimary: { type: 'boolean' },
+        },
+      },
+      CatalogTerm: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', readOnly: true },
+          type: { type: 'string', enum: ['brand', 'category'] },
+          name: { type: 'string', minLength: 2, maxLength: 100 },
+          slug: { type: 'string', readOnly: true },
+          active: { type: 'boolean' },
+          sortOrder: { type: 'number' },
+        },
       },
       ImageUploadRequest: {
         type: 'object',
@@ -275,5 +306,8 @@ const swaggerDefinition = {
 
 module.exports = swaggerJSDoc({
   definition: swaggerDefinition,
-  apis: [path.join(__dirname, '..', 'routes', '*.js').replace(/\\/g, '/')],
+  apis: [
+    path.join(__dirname, '..', 'routes', '*.js').replace(/\\/g, '/'),
+    path.join(__dirname, '..', 'app.js').replace(/\\/g, '/'),
+  ],
 });

@@ -14,6 +14,17 @@ const productSchema = new mongoose.Schema(
     gender: { type: Boolean, default: true },
     stock: { type: Number, min: 0, default: 0 },
     status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft', index: true },
+    images: {
+      type: [{
+        id: { type: String, required: true },
+        url: { type: String, required: true, trim: true },
+        key: { type: String, required: true, trim: true },
+        alt: { type: String, trim: true, maxlength: 160, default: '' },
+        sortOrder: { type: Number, min: 0, default: 0 },
+        isPrimary: { type: Boolean, default: false },
+      }],
+      default: [],
+    },
     uri: { type: String, trim: true, default: '' },
     imageKey: { type: String, trim: true, default: '' },
   },

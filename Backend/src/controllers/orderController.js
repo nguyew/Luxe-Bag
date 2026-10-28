@@ -3,6 +3,13 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const Coupon = require('../models/Coupon');
 const Review = require('../models/Review');
+const {
+  cancelPaymentIntent,
+  createPaymentIntent,
+} = require('../services/stripeService');
+const { refundOrderPayment } = require('../services/orderPaymentService');
+const { releaseOrderResources } = require('../services/orderResourceService');
+const { paymentTimeoutMinutes } = require('../config/env');
 
 const SHIPPING_FEE = 15;
 const FREE_SHIPPING_THRESHOLD = 500;
@@ -65,6 +72,7 @@ const createOrder = async (req, res) => {
   const orderItems = [];
   const problems = [];
   let redeemedCoupon = null;
+  let createdOrder = null;
   try {
     for (const [productId, qty] of quantities.entries()) {
       // Atomically reserve stock so concurrent orders cannot oversell a product.
@@ -130,7 +138,7 @@ const createOrder = async (req, res) => {
     }
     const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
     const now = new Date();
-    const order = await Order.create({
+    createdOrder = await Order.create({
       userId: req.user._id,
       status: 'pending',
       items: orderItems,
@@ -146,12 +154,39 @@ const createOrder = async (req, res) => {
       },
       couponCode: redeemedCoupon ? redeemedCoupon.code : null,
       paymentMethod,
-      // 
-      // Card payment is a demo payment method; no real charge is made.
-      paymentStatus: paymentMethod === 'card' ? 'paid' : 'unpaid',
+      paymentProvider: paymentMethod === 'card' ? 'stripe' : 'cod',
+      paymentStatus: paymentMethod === 'card' ? 'requires_payment' : 'unpaid',
+      paymentExpiresAt: paymentMethod === 'card'
+        ? new Date(now.getTime() + paymentTimeoutMinutes * 60 * 1000)
+        : null,
       history: [{ status: 'pending', at: now }],
     });
-    return res.status(201).json({ order: serializeOrder(order) });
+
+    // From this point the order owns the reservation. The outer catch must not
+    // restore it again; cancellation/failure uses the idempotent release service.
+    reserved.length = 0;
+    redeemedCoupon = null;
+
+    if (paymentMethod === 'card') {
+      try {
+        const intent = await createPaymentIntent(createdOrder);
+        createdOrder.paymentIntentId = intent.id;
+        await createdOrder.save();
+        return res.status(201).json({
+          order: serializeOrder(createdOrder),
+          payment: {
+            provider: 'stripe',
+            clientSecret: intent.client_secret,
+          },
+        });
+      } catch (error) {
+        await releaseOrderResources(createdOrder);
+        await Order.deleteOne({ _id: createdOrder._id });
+        throw error;
+      }
+    }
+
+    return res.status(201).json({ order: serializeOrder(createdOrder), payment: null });
   } catch (error) {
     await Promise.allSettled(reserved.map(({ productId, qty }) => Product.updateOne({ _id: productId }, { $inc: { stock: qty } })));
     if (redeemedCoupon) {
@@ -270,23 +305,36 @@ const getMyOrder = async (req, res) => {
 
 const cancelMyOrder = async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid order id.' });
-  const now = new Date();
-  const order = await Order.findOneAndUpdate(
-    { _id: req.params.id, userId: req.user._id, status: 'pending' },
-    { $set: { status: 'cancelled', cancelledAt: now }, $push: { history: { status: 'cancelled', at: now } } },
-    { new: true }
-  );
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user._id,
+    status: 'pending',
+  });
   if (!order) {
     const existing = await Order.findOne({ _id: req.params.id, userId: req.user._id });
     if (!existing) return res.status(404).json({ error: 'Order not found.', code: 'not_found' });
     return res.status(409).json({ error: 'This order can no longer be cancelled.', code: 'not_cancellable' });
   }
-  if (order.paymentStatus === 'paid') {
-    order.paymentStatus = 'refunded';
-    await order.save();
+
+  if (order.paymentStatus === 'processing') {
+    return res.status(409).json({
+      error: 'The payment is processing and the order cannot be cancelled yet.',
+      code: 'payment_processing',
+    });
   }
-  await Promise.all(order.items.map((item) => Product.updateOne({ _id: item.productId }, { $inc: { stock: item.qty } })));
-  return res.json({ order: serializeOrder(order) });
+  if (order.paymentMethod === 'card' && order.paymentStatus === 'requires_payment') {
+    await cancelPaymentIntent(order);
+  }
+  await refundOrderPayment(order);
+
+  const now = new Date();
+  order.status = 'cancelled';
+  order.cancelledAt = now;
+  order.history.push({ status: 'cancelled', at: now });
+  await order.save();
+  await releaseOrderResources(order);
+
+  return res.json({ order: serializeOrder(await Order.findById(order._id)) });
 };
 
 const requestReturn = async (req, res) => {

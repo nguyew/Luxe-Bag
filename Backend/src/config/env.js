@@ -11,12 +11,26 @@ const dotenv = require("dotenv");
 
 const port = Number.parseInt(process.env.PORT || "5000", 10);
 const nodeEnv = process.env.NODE_ENV || "development";
+const positiveInteger = (rawValue, fallback, minimum) => {
+  const value = Number.parseInt(rawValue || String(fallback), 10);
+  return Number.isFinite(value) ? Math.max(value, minimum) : fallback;
+};
+const paymentTimeoutMinutes = positiveInteger(process.env.PAYMENT_TIMEOUT_MINUTES, 30, 5);
+const paymentCleanupIntervalMinutes = positiveInteger(
+  process.env.PAYMENT_CLEANUP_INTERVAL_MINUTES,
+  5,
+  1,
+);
 
 if (Number.isNaN(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be a valid TCP port between 1 and 65535");
 }
 
 module.exports = {
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
   b2ApplicationKey: process.env.B2_APPLICATION_KEY || "",
   b2ApplicationKeyId: process.env.B2_APPLICATION_KEY_ID || "",
   b2BucketName: process.env.B2_BUCKET_NAME || "",
@@ -38,7 +52,12 @@ module.exports = {
     (nodeEnv === "production" ? "" : "development-only-change-me"),
   mongoUri: process.env.MONGODB_URI || "",
   nodeEnv,
+  paymentCleanupIntervalMinutes,
+  paymentTimeoutMinutes,
   port,
+  stripeCurrency: (process.env.STRIPE_CURRENCY || "usd").toLowerCase(),
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
 
   emailCodeTtlMinutes: Math.max(
     Number.parseInt(process.env.EMAIL_CODE_TTL_MINUTES || "10", 10),

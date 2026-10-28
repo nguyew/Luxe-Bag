@@ -24,10 +24,78 @@ const {
 const { listAdminOrders, updateAdminOrderStatus, resolveAdminReturn } = require('../controllers/adminOrderController');
 const { deleteAdminReview, listAdminReviews, moderateReview } = require('../controllers/reviewController');
 const { createCoupon, deleteCoupon, listAdminCoupons, updateCoupon } = require('../controllers/couponController');
+const {
+  addProductImage,
+  deleteProductImage,
+  reorderImages,
+  setPrimaryImage,
+} = require('../controllers/productImageController');
+const {
+  createTerm,
+  deleteTerm,
+  listTerms,
+  updateTerm,
+} = require('../controllers/catalogController');
+const { getSalesReport } = require('../controllers/reportController');
 
 const router = express.Router();
 
 router.use(authenticate, requireAdmin);
+
+/**
+ * @swagger
+ * /api/admin/reports/sales:
+ *   get:
+ *     tags: [Admin - Reports]
+ *     summary: Get paid sales, refunds, products, brands, and daily revenue
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: days, schema: { oneOf: [{ type: integer, minimum: 1, maximum: 366 }, { type: string, enum: [all] }] } }
+ *     responses:
+ *       200: { description: Sales report }
+ */
+router.get('/reports/sales', asyncHandler(getSalesReport));
+/**
+ * @swagger
+ * /api/admin/catalog/{type}:
+ *   get:
+ *     tags: [Admin - Catalog]
+ *     summary: List brands or categories, including inactive entries
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: type, required: true, schema: { type: string, enum: [brand, category] } }
+ *     responses:
+ *       200: { description: Catalog terms }
+ *   post:
+ *     tags: [Admin - Catalog]
+ *     summary: Create a brand or category
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: type, required: true, schema: { type: string, enum: [brand, category] } }
+ *     responses:
+ *       201: { description: Catalog term created }
+ */
+router.get('/catalog/:type', asyncHandler(listTerms));
+router.post('/catalog/:type', asyncHandler(createTerm));
+/**
+ * @swagger
+ * /api/admin/catalog/{type}/{id}:
+ *   patch:
+ *     tags: [Admin - Catalog]
+ *     summary: Update and optionally rename a brand or category
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Catalog term updated }
+ *   delete:
+ *     tags: [Admin - Catalog]
+ *     summary: Delete an unused brand or category
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Catalog term deleted }
+ *       409: { description: Catalog term is in use }
+ */
+router.patch('/catalog/:type/:id', asyncHandler(updateTerm));
+router.delete('/catalog/:type/:id', asyncHandler(deleteTerm));
 
 /**
  * @swagger
@@ -367,6 +435,10 @@ router.post(
   express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '10mb' }),
   asyncHandler(uploadImageProxy)
 );
+router.post('/products/:id/images', asyncHandler(addProductImage));
+router.put('/products/:id/images/reorder', asyncHandler(reorderImages));
+router.patch('/products/:id/images/:imageId/primary', asyncHandler(setPrimaryImage));
+router.delete('/products/:id/images/:imageId', asyncHandler(deleteProductImage));
 /**
  * @swagger
  * /api/admin/customers:

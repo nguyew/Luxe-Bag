@@ -2,6 +2,7 @@ const http = require('http');
 const app = require('./app');
 const { connectDatabase, disconnectDatabase } = require('./config/db');
 const { mongoUri, port } = require('./config/env');
+const { startPaymentCleanup, stopPaymentCleanup } = require('./services/paymentCleanupService');
 
 const server = http.createServer(app);
 
@@ -10,6 +11,7 @@ const start = async () => {
     await connectDatabase(mongoUri);
     server.listen(port, () => {
       console.log(`LuxeBag API listening on port ${port}`);
+      startPaymentCleanup();
     });
   } catch (error) {
     console.error('Unable to start the server:', error);
@@ -19,6 +21,7 @@ const start = async () => {
 
 const shutdown = async (signal) => {
   console.log(`${signal} received; shutting down`);
+  stopPaymentCleanup();
   server.close(async (error) => {
     if (error) {
       console.error('Unable to close the HTTP server:', error);

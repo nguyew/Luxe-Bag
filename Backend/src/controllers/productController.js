@@ -2,7 +2,10 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const Product = require('../models/Product');
 const Review = require('../models/Review');
+const CatalogTerm = require('../models/CatalogTerm');
 const { createUpload, deleteObject, uploadObject } = require('../services/b2Storage');
+const { createImage, syncLegacyPrimary } = require('../utils/productImages');
+const { buildProductFilter, productSort } = require('../utils/productQuery');
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const fields = ['handbagName', 'brand', 'category', 'cost', 'originalCost', 'percentOff', 'discountMode', 'color', 'gender', 'stock', 'status', 'uri', 'imageKey'];
@@ -24,6 +27,10 @@ const validate = (body, partial = false) => {
   if (body.stock !== undefined && (!Number.isInteger(Number(body.stock)) || Number(body.stock) < 0)) errors.push('stock must be a non-negative integer.');
   if (body.status !== undefined && !['draft', 'published', 'archived'].includes(body.status)) errors.push('Invalid product status.');
   if (body.color !== undefined && (!Array.isArray(body.color) || body.color.some((value) => typeof value !== 'string'))) errors.push('color must be an array of strings.');
+  const hasUri = body.uri !== undefined;
+  const hasImageKey = body.imageKey !== undefined;
+  if (hasUri !== hasImageKey) errors.push('uri and imageKey must be provided together.');
+  if (hasUri && body.uri && !/^https?:\/\/\S+$/i.test(String(body.uri))) errors.push('uri must be a valid HTTP image URL.');
   return errors;
 };
 
@@ -31,6 +38,7 @@ const pick = (body) => Object.fromEntries(fields.filter((field) => body[field] !
 const toSlug = (value) => String(value)
   .normalize('NFKD')
   .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[đĐ]/g, 'd')
   .toLowerCase()
   .trim()
   .replace(/[^a-z0-9]+/g, '-')
@@ -39,6 +47,20 @@ const toSlug = (value) => String(value)
 const createSlug = (body) => {
   const base = toSlug(`${body.brand}-${body.handbagName}`) || 'product';
   return `${base}-${crypto.randomUUID().slice(0, 8)}`;
+};
+const ensureCatalogTerm = async (type, rawName) => {
+  const name = String(rawName || '').trim();
+  const slug = toSlug(name);
+  if (name.length < 2 || !slug) return;
+  try {
+    await CatalogTerm.updateOne(
+      { type, slug },
+      { $setOnInsert: { type, name, slug, active: true, sortOrder: 0 } },
+      { upsert: true }
+    );
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+  }
 };
 const findById = (id) => mongoose.isValidObjectId(id) ? Product.findById(id) : null;
 const sendNotFound = (res, id) => res.status(mongoose.isValidObjectId(id) ? 404 : 400).json({ error: mongoose.isValidObjectId(id) ? 'Product not found.' : 'Invalid product id.' });
@@ -71,9 +93,30 @@ const attachFeedbacks = async (products, includeHidden = false) => {
 };
 
 const listProducts = async (req, res) => {
-  const filter = req.user ? {} : { status: 'published' };
-  const products = await Product.find(filter).sort({ createdAt: -1 });
-  return res.json({ products: await attachFeedbacks(products, req.user?.role === 'admin') });
+  const isAdmin = req.user?.role === 'admin';
+  const page = Math.max(Number.parseInt(req.query.page || '1', 10), 1);
+  const defaultLimit = isAdmin ? 500 : 100;
+  const maxLimit = isAdmin ? 500 : 100;
+  const limit = Math.min(
+    Math.max(Number.parseInt(req.query.limit || String(defaultLimit), 10), 1),
+    maxLimit
+  );
+  const { filter, minPrice, maxPrice } = buildProductFilter(req.query, isAdmin);
+  if (Number.isFinite(minPrice) && Number.isFinite(maxPrice) && minPrice > maxPrice) {
+    return res.status(400).json({ error: 'minPrice cannot be greater than maxPrice.' });
+  }
+
+  const [products, total] = await Promise.all([
+    Product.find(filter)
+      .sort(productSort(req.query.sort))
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Product.countDocuments(filter),
+  ]);
+  return res.json({
+    products: await attachFeedbacks(products, isAdmin),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  });
 };
 
 const getProduct = async (req, res) => {
@@ -89,9 +132,21 @@ const createProduct = async (req, res) => {
   const errors = validate(req.body || {});
   if (errors.length) return res.status(400).json({ error: 'Validation failed.', details: errors });
   const productData = { ...pick(req.body), slug: createSlug(req.body) };
+  if (productData.uri && productData.imageKey) {
+    productData.images = [createImage({
+      url: productData.uri,
+      key: productData.imageKey,
+      alt: productData.handbagName,
+      isPrimary: true,
+    })];
+  }
 
   // The suffix keeps slugs unique when product names or brands are repeated.
   const product = await Product.create(productData);
+  await Promise.all([
+    ensureCatalogTerm('brand', product.brand),
+    ensureCatalogTerm('category', product.category),
+  ]);
   return res.status(201).json({ product });
 };
 
@@ -101,10 +156,41 @@ const updateProduct = async (req, res) => {
   const errors = validate(req.body || {}, true);
   if (errors.length) return res.status(400).json({ error: 'Validation failed.', details: errors });
   const oldImageKey = product.imageKey;
-  Object.assign(product, pick(req.body));
+  const updates = pick(req.body);
+  delete updates.uri;
+  delete updates.imageKey;
+  Object.assign(product, updates);
+
+  if (req.body?.uri !== undefined && req.body?.imageKey !== undefined) {
+    const nextUrl = String(req.body.uri || '').trim();
+    const nextKey = String(req.body.imageKey || '').trim();
+    const primary = product.images.find((image) => image.isPrimary) || product.images[0];
+    if (nextUrl && nextKey) {
+      if (primary) {
+        primary.url = nextUrl;
+        primary.key = nextKey;
+        primary.alt = product.handbagName;
+      } else {
+        product.images.push(createImage({
+          url: nextUrl,
+          key: nextKey,
+          alt: product.handbagName,
+          isPrimary: true,
+        }));
+      }
+    } else if (primary) {
+      product.images = product.images.filter((image) => image.id !== primary.id);
+    }
+    syncLegacyPrimary(product);
+  }
   if (!product.slug) product.slug = createSlug({ brand: product.brand, handbagName: product.handbagName });
   await product.save();
-  if (oldImageKey && oldImageKey !== product.imageKey) await deleteObject(oldImageKey);
+  await Promise.all([
+    ensureCatalogTerm('brand', product.brand),
+    ensureCatalogTerm('category', product.category),
+  ]);
+  const stillUsed = product.images.some((image) => image.key === oldImageKey);
+  if (oldImageKey && oldImageKey !== product.imageKey && !stillUsed) await deleteObject(oldImageKey);
   return res.json({ product });
 };
 
@@ -157,8 +243,12 @@ const bulkDiscount = async (req, res) => {
 const deleteProduct = async (req, res) => {
   const product = await findById(req.params.id);
   if (!product) return sendNotFound(res, req.params.id);
+  const keys = [...new Set([
+    product.imageKey,
+    ...(product.images || []).map((image) => image.key),
+  ].filter(Boolean))];
   await Product.deleteOne({ _id: product._id });
-  if (product.imageKey) await deleteObject(product.imageKey);
+  await Promise.allSettled(keys.map((key) => deleteObject(key)));
   return res.status(204).send();
 };
 
