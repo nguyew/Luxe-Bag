@@ -19,6 +19,7 @@ const cartRoutes = require('./routes/cartRoutes');
 const favoriteRoutes = require('./routes/favoriteRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const catalogRoutes = require('./routes/catalogRoutes');
+const promotionRoutes = require('./routes/promotionRoutes');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/catalog', catalogRoutes);
+app.use('/api/promotions', promotionRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

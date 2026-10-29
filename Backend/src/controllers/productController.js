@@ -6,6 +6,7 @@ const CatalogTerm = require('../models/CatalogTerm');
 const { createUpload, deleteObject, uploadObject } = require('../services/b2Storage');
 const { createImage, syncLegacyPrimary } = require('../utils/productImages');
 const { buildProductFilter, productSort } = require('../utils/productQuery');
+const { discountedProduct, getActivePromotions, selectPromotion } = require('../services/pricingService');
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const fields = ['handbagName', 'brand', 'category', 'cost', 'originalCost', 'percentOff', 'discountMode', 'color', 'gender', 'stock', 'status', 'uri', 'imageKey'];
@@ -47,6 +48,19 @@ const toSlug = (value) => String(value)
 const createSlug = (body) => {
   const base = toSlug(`${body.brand}-${body.handbagName}`) || 'product';
   return `${base}-${crypto.randomUUID().slice(0, 8)}`;
+};
+const resolveCatalogValue = async (type, value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return raw;
+  const term = await CatalogTerm.findOne({
+    type,
+    $or: [
+      ...(mongoose.isValidObjectId(raw) ? [{ _id: raw }] : []),
+      { name: raw },
+      { slug: raw },
+    ],
+  }).select('name').lean();
+  return term?.name || raw;
 };
 const ensureCatalogTerm = async (type, rawName) => {
   const name = String(rawName || '').trim();
@@ -92,6 +106,11 @@ const attachFeedbacks = async (products, includeHidden = false) => {
   }));
 };
 
+const attachPromotions = async (products) => {
+  const promotions = await getActivePromotions();
+  return products.map((product) => discountedProduct(product, selectPromotion(promotions, product)));
+};
+
 const listProducts = async (req, res) => {
   const isAdmin = req.user?.role === 'admin';
   const page = Math.max(Number.parseInt(req.query.page || '1', 10), 1);
@@ -113,8 +132,9 @@ const listProducts = async (req, res) => {
       .limit(limit),
     Product.countDocuments(filter),
   ]);
+  const withFeedbacks = await attachFeedbacks(products, isAdmin);
   return res.json({
-    products: await attachFeedbacks(products, isAdmin),
+    products: isAdmin ? withFeedbacks : await attachPromotions(withFeedbacks),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 };
@@ -125,13 +145,27 @@ const getProduct = async (req, res) => {
     : null);
   if (!product) return sendNotFound(res, req.params.id);
   const [withFeedbacks] = await attachFeedbacks([product], req.user?.role === 'admin');
-  return res.json({ product: withFeedbacks });
+  const [result] = req.user?.role === 'admin'
+    ? [withFeedbacks]
+    : await attachPromotions([withFeedbacks]);
+  return res.json({ product: result });
 };
 
 const createProduct = async (req, res) => {
   const errors = validate(req.body || {});
   if (errors.length) return res.status(400).json({ error: 'Validation failed.', details: errors });
-  const productData = { ...pick(req.body), slug: createSlug(req.body) };
+  const productData = {
+    ...pick(req.body),
+    originalCost: undefined,
+    percentOff: undefined,
+    discountMode: undefined,
+    slug: createSlug(req.body),
+  };
+  delete productData.originalCost;
+  delete productData.percentOff;
+  delete productData.discountMode;
+  productData.brand = await resolveCatalogValue('brand', productData.brand);
+  productData.category = await resolveCatalogValue('category', productData.category);
   if (productData.uri && productData.imageKey) {
     productData.images = [createImage({
       url: productData.uri,
@@ -159,6 +193,8 @@ const updateProduct = async (req, res) => {
   const updates = pick(req.body);
   delete updates.uri;
   delete updates.imageKey;
+  if (updates.brand !== undefined) updates.brand = await resolveCatalogValue('brand', updates.brand);
+  if (updates.category !== undefined) updates.category = await resolveCatalogValue('category', updates.category);
   Object.assign(product, updates);
 
   if (req.body?.uri !== undefined && req.body?.imageKey !== undefined) {
@@ -192,52 +228,6 @@ const updateProduct = async (req, res) => {
   const stillUsed = product.images.some((image) => image.key === oldImageKey);
   if (oldImageKey && oldImageKey !== product.imageKey && !stillUsed) await deleteObject(oldImageKey);
   return res.json({ product });
-};
-
-const validateBulkDiscount = (body) => {
-  const errors = [];
-  const scope = body.scope;
-  const percentOff = Number(body.percentOff);
-  if (!['all', 'name', 'brand', 'category'].includes(scope)) errors.push('scope must be all, name, brand, or category.');
-  if (scope !== 'all' && (typeof body.value !== 'string' || !body.value.trim())) errors.push('value is required for this scope.');
-  if (!Number.isFinite(percentOff) || percentOff < 0 || percentOff > 0.9) errors.push('percentOff must be between 0 and 0.9.');
-  if (!['real', 'fake'].includes(body.discountMode)) errors.push('discountMode must be real or fake.');
-  return errors;
-};
-
-const bulkDiscount = async (req, res) => {
-  const body = req.body || {};
-  const errors = validateBulkDiscount(body);
-  if (errors.length) return res.status(400).json({ error: 'Validation failed.', details: errors });
-
-  const filter = body.scope === 'all' ? {} : { [body.scope === 'name' ? 'handbagName' : body.scope]: body.value.trim() };
-  const products = await Product.find(filter);
-  const percentOff = Number(body.percentOff);
-  const operations = products.map((product) => {
-    const currentCost = Number(product.cost);
-    const baseCost =
-      product.discountMode === 'real' && Number(product.originalCost) > 0
-        ? Number(product.originalCost)
-        : currentCost;
-    const update = percentOff === 0
-      ? body.discountMode === 'real'
-        ? { $set: { cost: baseCost }, $unset: { originalCost: 1 } }
-        : { $unset: { originalCost: 1 } }
-      : body.discountMode === 'real'
-        ? { $set: { cost: Number((baseCost * (1 - percentOff)).toFixed(2)), originalCost: baseCost } }
-        : { $set: { cost: currentCost, originalCost: Number((currentCost / (1 - percentOff)).toFixed(2)) } };
-
-    return {
-      updateOne: {
-        filter: { _id: product._id },
-        update: { ...update, $set: { ...(update.$set || {}), percentOff, discountMode: body.discountMode } },
-      },
-    };
-  });
-
-  if (operations.length) await Product.bulkWrite(operations);
-  const updatedProducts = operations.length ? await Product.find(filter) : [];
-  return res.json({ updated: updatedProducts.length, products: updatedProducts });
 };
 
 const deleteProduct = async (req, res) => {
@@ -276,7 +266,6 @@ const uploadImageProxy = async (req, res) => {
 module.exports = {
   createImageUpload,
   createProduct,
-  bulkDiscount,
   deleteProduct,
   getProduct,
   listProducts,

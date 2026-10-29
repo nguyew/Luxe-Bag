@@ -210,24 +210,6 @@ export async function bulkUpdateHandbags(ids, patch) {
   return { updated, failed };
 }
 
-/**
- * Áp dụng giảm giá theo nhóm. `real` giảm giá bán; `fake` chỉ tạo giá gốc
- * hiển thị cao hơn mà không thay đổi giá bán hiện tại.
- */
-export async function applyBulkDiscount({ scope, value, percentOff, discountMode }) {
-  const response = await backendApi.post('api/admin/products/bulk-discount', {
-    scope,
-    ...(scope === 'all' ? {} : { value }),
-    percentOff,
-    discountMode,
-  });
-  if (!Number.isInteger(response?.updated) || !Array.isArray(response.products)) {
-    throw new Error('Unexpected response from the bulk discount endpoint.');
-  }
-  response.products.forEach(upsertHandbag);
-  return { updated: response.updated, failed: [] };
-}
-
 // ---------------------------------------------------------------------------
 // Kiểm duyệt đánh giá (Backend)
 // ---------------------------------------------------------------------------

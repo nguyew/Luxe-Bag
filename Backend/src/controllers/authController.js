@@ -3,7 +3,11 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const crypto = require("crypto");
 const { deleteObject, uploadObject } = require("../services/b2Storage");
-const { jwtExpiresIn, jwtSecret } = require("../config/env");
+const {
+  emailVerificationEnabled,
+  jwtExpiresIn,
+  jwtSecret,
+} = require("../config/env");
 const { publicUser } = require("../utils/user");
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -75,7 +79,7 @@ const login = async (req, res) => {
     return res.status(403).json({ error: "This account is disabled." });
   }
 
-  if (!user.emailVerifiedAt) {
+  if (emailVerificationEnabled && !user.emailVerifiedAt) {
     return res.status(403).json({
       error: "Please verify your email before signing in.",
       code: "email_not_verified",

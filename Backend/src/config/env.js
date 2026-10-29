@@ -21,6 +21,9 @@ const paymentCleanupIntervalMinutes = positiveInteger(
   5,
   1,
 );
+const emailVerificationEnabled =
+  String(process.env.EMAIL_VERIFICATION_ENABLED || "true").toLowerCase() ===
+  "true";
 
 if (Number.isNaN(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be a valid TCP port between 1 and 65535");
@@ -63,6 +66,7 @@ module.exports = {
     Number.parseInt(process.env.EMAIL_CODE_TTL_MINUTES || "10", 10),
     5,
   ),
+  emailVerificationEnabled,
   emailVerificationSecret: process.env.EMAIL_VERIFICATION_SECRET || "",
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD || "",
   gmailUser: process.env.GMAIL_USER || "",

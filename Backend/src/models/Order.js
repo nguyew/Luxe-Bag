@@ -9,6 +9,7 @@ const orderItemSchema = new mongoose.Schema({
   handbagId: { type: String, required: true },
   name: { type: String, required: true },
   brand: { type: String, default: '' },
+  category: { type: String, default: '' },
   uri: { type: String, default: '' },
   unitPrice: { type: Number, required: true, min: 0 },
   qty: { type: Number, required: true, min: 1, max: 10 },

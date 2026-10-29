@@ -47,9 +47,9 @@ export default function AdminCouponFormScreen({ navigation, route }) {
   const [allCodes, setAllCodes] = useState([]);
 
   const [code, setCode] = useState('');
-  const [type, setType] = useState('percent');
   const [value, setValue] = useState('');
   const [minSubtotal, setMinSubtotal] = useState('');
+  const [maxDiscount, setMaxDiscount] = useState('');
   const [usageLimit, setUsageLimit] = useState('');
   const [expiry, setExpiry] = useState('none'); // 'none' | '7' | '30' | '90' | 'keep'
   const [active, setActive] = useState(true);
@@ -73,9 +73,9 @@ export default function AdminCouponFormScreen({ navigation, route }) {
         if (found) {
           setExisting(found);
           setCode(found.code);
-          setType(found.type);
           setValue(String(found.value));
           setMinSubtotal(found.minSubtotal ? String(found.minSubtotal) : '');
+          setMaxDiscount(found.maxDiscount ? String(found.maxDiscount) : '');
           setUsageLimit(found.usageLimit !== null ? String(found.usageLimit) : '');
           setExpiry(found.expiresAt ? 'keep' : 'none');
           setActive(found.active);
@@ -107,7 +107,7 @@ export default function AdminCouponFormScreen({ navigation, route }) {
     const amount = toNumber(value);
     if (!value.trim() || !Number.isFinite(amount) || amount <= 0) {
       next.value = 'Enter an amount above 0.';
-    } else if (type === 'percent' && (amount > 100 || !Number.isInteger(amount))) {
+    } else if (amount > 100 || !Number.isInteger(amount)) {
       next.value = 'Use a whole number from 1 to 100.';
     }
 
@@ -130,11 +130,22 @@ export default function AdminCouponFormScreen({ navigation, route }) {
     if (expiry === 'keep') expiresAt = existing?.expiresAt || null;
     else if (expiry !== 'none') expiresAt = expiryFromDays(Number(expiry));
 
+    let cap = null;
+    if (maxDiscount.trim()) {
+      cap = toNumber(maxDiscount);
+      if (!Number.isFinite(cap) || cap <= 0) next.maxDiscount = 'Enter an amount above 0.';
+    }
+    if (Object.keys(next).length > 0) {
+      setErrors(next);
+      return;
+    }
+
     const data = {
       code: normalized,
-      type,
+      type: 'percent',
       value: amount,
       minSubtotal: min,
+      maxDiscount: cap,
       usageLimit: limit,
       expiresAt,
       active,
@@ -158,7 +169,7 @@ export default function AdminCouponFormScreen({ navigation, route }) {
       setBusy(false);
       Alert.alert('Discount code', 'Could not save the code. Please try again.');
     }
-  }, [busy, code, type, value, minSubtotal, usageLimit, expiry, active, existing, editing, couponId, allCodes, navigation]);
+  }, [busy, code, value, minSubtotal, maxDiscount, usageLimit, expiry, active, existing, editing, couponId, allCodes, navigation]);
 
   const remove = useCallback(() => {
     Alert.alert('Delete this code?', 'Orders that already used it are not affected.', [
@@ -226,37 +237,25 @@ export default function AdminCouponFormScreen({ navigation, route }) {
           blurOnSubmit={false}
         />
 
-        <Text style={styles.label}>Type</Text>
-        <View style={styles.segment}>
-          {[
-            { key: 'percent', label: 'Percentage (%)' },
-            { key: 'fixed', label: 'Fixed amount ($)' },
-          ].map((option) => (
-            <Pressable
-              key={option.key}
-              onPress={() => setType(option.key)}
-              style={[styles.segmentItem, type === option.key && styles.segmentOn]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: type === option.key }}
-            >
-              <Text style={[styles.segmentText, type === option.key && styles.segmentTextOn]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
         <AuthField
           ref={valueRef}
-          label={type === 'percent' ? 'Discount (%)' : 'Discount amount ($)'}
+          label="Discount (%)"
           value={value}
           onChangeText={setValue}
           error={errors.value}
-          placeholder={type === 'percent' ? '10' : '15'}
-          keyboardType="decimal-pad"
+          placeholder="10"
+          keyboardType="number-pad"
           returnKeyType="next"
           onSubmitEditing={() => minRef.current?.focus()}
           blurOnSubmit={false}
+        />
+        <AuthField
+          label="Maximum discount ($, optional)"
+          value={maxDiscount}
+          onChangeText={setMaxDiscount}
+          error={errors.maxDiscount}
+          placeholder="Unlimited"
+          keyboardType="decimal-pad"
         />
         <AuthField
           ref={minRef}

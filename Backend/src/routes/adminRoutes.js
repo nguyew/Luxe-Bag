@@ -13,7 +13,6 @@ const {
 const {
   createImageUpload,
   createProduct,
-  bulkDiscount,
   deleteProduct,
   getProduct,
   listProducts,
@@ -37,6 +36,9 @@ const {
   updateTerm,
 } = require('../controllers/catalogController');
 const { getSalesReport } = require('../controllers/reportController');
+const {
+  createPromotion, deletePromotion, listPromotions, updatePromotion,
+} = require('../controllers/promotionController');
 
 const router = express.Router();
 
@@ -55,6 +57,77 @@ router.use(authenticate, requireAdmin);
  *       200: { description: Sales report }
  */
 router.get('/reports/sales', asyncHandler(getSalesReport));
+/**
+ * @swagger
+ * /api/admin/promotions:
+ *   get:
+ *     tags: [Admin - Promotions]
+ *     summary: List all promotions
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Promotions, including inactive and expired records
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 promotions: { type: array, items: { $ref: '#/components/schemas/Promotion' } }
+ *   post:
+ *     tags: [Admin - Promotions]
+ *     summary: Create a promotion
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [id, name, percentOff, scope]
+ *             properties:
+ *               id: { type: string, pattern: '^pr-[a-z0-9]+(?:-[a-z0-9]+)*$' }
+ *               name: { type: string, minLength: 2, maxLength: 120 }
+ *               percentOff: { type: number, minimum: 0.01, maximum: 0.9, example: 0.2 }
+ *               scope: { type: string, enum: [all, category, brand] }
+ *               targetValue: { type: string }
+ *               expiresAt: { type: string, format: date-time, nullable: true }
+ *               active: { type: boolean, default: true }
+ *     responses:
+ *       201: { description: Promotion created }
+ *       400: { description: Invalid promotion }
+ *       409: { description: Duplicate promotion }
+ */
+router.get('/promotions', asyncHandler(listPromotions));
+router.post('/promotions', asyncHandler(createPromotion));
+/**
+ * @swagger
+ * /api/admin/promotions/{id}:
+ *   patch:
+ *     tags: [Admin - Promotions]
+ *     summary: Update a promotion
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/Promotion' }
+ *     responses:
+ *       200: { description: Promotion updated }
+ *       404: { description: Promotion not found }
+ *   delete:
+ *     tags: [Admin - Promotions]
+ *     summary: Delete a promotion
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Promotion deleted }
+ *       404: { description: Promotion not found }
+ */
+router.patch('/promotions/:id', asyncHandler(updatePromotion));
+router.delete('/promotions/:id', asyncHandler(deletePromotion));
 /**
  * @swagger
  * /api/admin/catalog/{type}:
@@ -308,20 +381,6 @@ router.delete('/coupons/:id', asyncHandler(deleteCoupon));
 router.route('/products')
   .post(asyncHandler(createProduct))
   .get(asyncHandler(listProducts));
-
-/**
- * @swagger
- * /api/admin/products/bulk-discount:
- *   post:
- *     tags: [Admin - Products]
- *     summary: Apply a real or display-only discount to a product group
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200: { description: Products updated }
- *       400: { description: Validation failed }
- */
-router.post('/products/bulk-discount', asyncHandler(bulkDiscount));
 
 /**
  * @swagger

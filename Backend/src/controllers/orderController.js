@@ -10,6 +10,7 @@ const {
 const { refundOrderPayment } = require('../services/orderPaymentService');
 const { releaseOrderResources } = require('../services/orderResourceService');
 const { paymentTimeoutMinutes } = require('../config/env');
+const { getActivePromotions, round2: roundPrice, selectPromotion } = require('../services/pricingService');
 
 const SHIPPING_FEE = 15;
 const FREE_SHIPPING_THRESHOLD = 500;
@@ -25,6 +26,10 @@ const RETURN_REASONS = [
 ];
 
 const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const matchesCouponTarget = (coupon, product) =>
+  coupon.scope === 'all'
+  || (coupon.scope === 'category' && coupon.targetValue === product.category)
+  || (coupon.scope === 'brand' && coupon.targetValue === product.brand);
 const asId = (value) => value?._id ? value._id.toString() : String(value?.id || value || '');
 const serializeOrder = (order) => {
   const raw = order.toObject ? order.toObject() : order;
@@ -73,6 +78,7 @@ const createOrder = async (req, res) => {
   const problems = [];
   let redeemedCoupon = null;
   let createdOrder = null;
+  const activePromotions = await getActivePromotions();
   try {
     for (const [productId, qty] of quantities.entries()) {
       // Atomically reserve stock so concurrent orders cannot oversell a product.
@@ -92,13 +98,19 @@ const createOrder = async (req, res) => {
         continue;
       }
       reserved.push({ productId, qty });
+      const promotionSelection = selectPromotion(activePromotions, product);
+      const rawPrice = Number(product.cost);
+      const unitPrice = roundPrice(promotionSelection
+        ? rawPrice - promotionSelection.discount
+        : rawPrice);
       orderItems.push({
         productId: product._id,
         handbagId: product._id.toString(),
         name: product.handbagName,
         brand: product.brand || '',
+        category: product.category || '',
         uri: product.uri || '',
-        unitPrice: round2(Number(product.cost)),
+        unitPrice,
         qty,
       });
     }
@@ -117,7 +129,8 @@ const createOrder = async (req, res) => {
         {
           code: normalizedCouponCode,
           active: true,
-          minSubtotal: { $lte: subtotal },
+          type: 'percent',
+          createdAt: { $lte: nowForCoupon },
           $and: [
             { $or: [{ expiresAt: null }, { expiresAt: { $gt: nowForCoupon } }] },
             { $or: [{ usageLimit: null }, { $expr: { $lt: ['$usedCount', '$usageLimit'] } }] },
@@ -131,10 +144,21 @@ const createOrder = async (req, res) => {
         reserved.length = 0;
         return res.status(400).json({ error: 'This discount code is invalid, expired, inactive, or no longer available.', code: 'invalid_coupon' });
       }
-      const rawDiscount = redeemedCoupon.type === 'percent'
-        ? (subtotal * redeemedCoupon.value) / 100
-        : redeemedCoupon.value;
-      discount = round2(Math.min(Math.max(rawDiscount, 0), subtotal));
+      const eligibleSubtotal = round2(orderItems
+        .filter((item) => matchesCouponTarget(redeemedCoupon, item))
+        .reduce((sum, item) => sum + item.unitPrice * item.qty, 0));
+      if (eligibleSubtotal < Number(redeemedCoupon.minSubtotal || 0)) {
+        await Coupon.updateOne({ _id: redeemedCoupon._id, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } });
+        await Promise.all(reserved.map(({ productId, qty }) => Product.updateOne({ _id: productId }, { $inc: { stock: qty } })));
+        reserved.length = 0;
+        return badRequest(res, 'This coupon minimum spend was not met for eligible products.', { code: 'coupon_minimum_spend' });
+      }
+      const rawDiscount = (eligibleSubtotal * redeemedCoupon.value) / 100;
+      discount = round2(Math.min(
+        Math.max(rawDiscount, 0),
+        eligibleSubtotal,
+        redeemedCoupon.maxDiscount == null ? Number.POSITIVE_INFINITY : redeemedCoupon.maxDiscount
+      ));
     }
     const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
     const now = new Date();

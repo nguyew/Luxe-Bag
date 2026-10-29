@@ -1,7 +1,11 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const { jwtExpiresIn, jwtSecret } = require("../config/env");
+const {
+  emailVerificationEnabled,
+  jwtExpiresIn,
+  jwtSecret,
+} = require("../config/env");
 const { publicUser } = require("../utils/user");
 const {
   issueAndSendVerificationCode,
@@ -60,8 +64,15 @@ async function register(req, res) {
     name: name.trim(),
     email: normalizedEmail,
     passwordHash: await bcrypt.hash(password, 12),
-    emailVerifiedAt: null,
+    emailVerifiedAt: emailVerificationEnabled ? null : new Date(),
   });
+
+  if (!emailVerificationEnabled) {
+    return res.status(201).json({
+      token: issueToken(user),
+      user: publicUser(user),
+    });
+  }
 
   try {
     await issueAndSendVerificationCode(user, { enforceCooldown: false });

@@ -9,6 +9,8 @@
     "start": "node src/server.js",
     "test": "node --test test/*.test.js",
     "seed": "node scripts/seed-mongodb.js",
+    "seed:reset": "node scripts/seed-mongodb.js --reset",
+    "seed:migrate": "node scripts/seed-mongodb.js --migrate",
     "seed:feedbacks": "node scripts/seed-feedbacks.js",
     "migrate:verify-existing-users": "node scripts/mark-existing-users-verified.js",
     "migrate:product-images": "node scripts/migrate-product-images.js",

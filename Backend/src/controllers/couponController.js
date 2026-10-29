@@ -10,6 +10,9 @@ const serializeCoupon = (coupon) => {
     type: raw.type,
     value: Number(raw.value),
     minSubtotal: Number(raw.minSubtotal || 0),
+    maxDiscount: raw.maxDiscount == null ? null : Number(raw.maxDiscount),
+    scope: raw.scope || 'all',
+    targetValue: raw.targetValue || '',
     expiresAt: raw.expiresAt ? new Date(raw.expiresAt).toISOString() : null,
     active: raw.active !== false,
     usageLimit: raw.usageLimit == null ? null : Number(raw.usageLimit),
@@ -22,16 +25,22 @@ const serializeCoupon = (coupon) => {
 const validateCouponBody = (body = {}) => {
   const errors = [];
   const code = normalizeCode(body.code);
-  const type = body.type;
+  const type = body.type || 'percent';
   const value = Number(body.value);
   const minSubtotal = Number(body.minSubtotal ?? 0);
+  const maxDiscount = body.maxDiscount == null || body.maxDiscount === '' ? null : Number(body.maxDiscount);
+  const scope = body.scope || 'all';
+  const targetValue = String(body.targetValue || '').trim();
   const usageLimit = body.usageLimit == null || body.usageLimit === '' ? null : Number(body.usageLimit);
   const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
 
   if (!/^[A-Z0-9_-]{3,20}$/.test(code)) errors.push('code must contain 3-20 letters, numbers, underscores, or hyphens.');
-  if (!['percent', 'fixed'].includes(type)) errors.push('type must be percent or fixed.');
+  if (type !== 'percent') errors.push('type must be percent.');
   if (!Number.isFinite(value) || value <= 0 || (type === 'percent' && value > 100)) errors.push('value is invalid.');
   if (!Number.isFinite(minSubtotal) || minSubtotal < 0) errors.push('minSubtotal must be zero or greater.');
+  if (maxDiscount !== null && (!Number.isFinite(maxDiscount) || maxDiscount <= 0)) errors.push('maxDiscount must be greater than zero or null.');
+  if (!['all', 'category', 'brand'].includes(scope)) errors.push('scope must be all, category, or brand.');
+  if (scope !== 'all' && !targetValue) errors.push('targetValue is required for category and brand coupons.');
   if (usageLimit !== null && (!Number.isInteger(usageLimit) || usageLimit < 1)) errors.push('usageLimit must be a positive integer or null.');
   if (expiresAt && Number.isNaN(expiresAt.getTime())) errors.push('expiresAt must be a valid date or null.');
   if (body.active !== undefined && typeof body.active !== 'boolean') errors.push('active must be a boolean.');
@@ -40,15 +49,19 @@ const validateCouponBody = (body = {}) => {
     errors,
     data: {
       code, type, value: round2(value), minSubtotal: round2(minSubtotal),
+      maxDiscount: maxDiscount === null ? null : round2(maxDiscount), scope, targetValue,
       usageLimit, expiresAt, active: body.active !== false,
     },
   };
 };
 
 const listPublicCoupons = async (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const now = new Date();
   const coupons = await Coupon.find({
     active: true,
+    type: 'percent',
+    createdAt: { $lte: now },
     $and: [
       { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
       { $or: [{ usageLimit: null }, { $expr: { $lt: ['$usedCount', '$usageLimit'] } }] },
@@ -58,6 +71,7 @@ const listPublicCoupons = async (_req, res) => {
 };
 
 const listAdminCoupons = async (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const coupons = await Coupon.find({}).sort({ createdAt: -1 });
   return res.json({ coupons: coupons.map(serializeCoupon) });
 };
@@ -66,7 +80,7 @@ const createCoupon = async (req, res) => {
   const { errors, data } = validateCouponBody(req.body);
   if (errors.length) return res.status(400).json({ error: 'Invalid coupon.', details: errors });
   const id = String(req.body?.id || '').trim();
-  if (!/^cp-[a-z0-9]+$/i.test(id)) return res.status(400).json({ error: 'A valid coupon id is required.' });
+  if (!/^cp-[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(id)) return res.status(400).json({ error: 'A valid coupon id is required.' });
   try {
     const coupon = await Coupon.create({ _id: id, ...data, usedCount: 0 });
     return res.status(201).json({ coupon: serializeCoupon(coupon) });
@@ -87,6 +101,9 @@ const updateCoupon = async (req, res) => {
     existing.type = data.type;
     existing.value = data.value;
     existing.minSubtotal = data.minSubtotal;
+    existing.maxDiscount = data.maxDiscount;
+    existing.scope = data.scope;
+    existing.targetValue = data.targetValue;
     existing.usageLimit = data.usageLimit;
     existing.expiresAt = data.expiresAt;
     existing.active = data.active;

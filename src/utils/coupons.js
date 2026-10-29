@@ -1,8 +1,8 @@
 /**
  * Mã giảm giá: kiểm tra, tính tiền giảm. Thuần (không gọi mạng).
  *
- * coupon: { id, code, type: 'percent' | 'fixed', value, minSubtotal,
- *           expiresAt (ISO | null), active, usageLimit (số | null), usedCount }
+ * coupon: { id, code, type: 'percent', value, minSubtotal, maxDiscount,
+ *           scope, targetValue, expiresAt (ISO | null), active, usageLimit, usedCount }
  */
 import { round2 } from './orders';
 
@@ -20,8 +20,12 @@ export function couponStatus(coupon, now = Date.now()) {
 /** Số tiền được giảm cho tiền hàng `subtotal` (không bao giờ vượt quá tiền hàng). */
 export function calcCouponDiscount(coupon, subtotal) {
   if (!(subtotal > 0)) return 0;
-  const raw = coupon.type === 'percent' ? (subtotal * coupon.value) / 100 : coupon.value;
-  return round2(Math.min(Math.max(raw, 0), subtotal));
+  const raw = (subtotal * coupon.value) / 100;
+  return round2(Math.min(
+    Math.max(raw, 0),
+    subtotal,
+    coupon.maxDiscount == null ? Number.POSITIVE_INFINITY : coupon.maxDiscount
+  ));
 }
 
 /**
@@ -58,7 +62,7 @@ export function describeCouponError(result) {
     case 'used_up':
       return 'This code has been fully redeemed.';
     case 'min_subtotal':
-      return `Spend at least $${result.minSubtotal} to use this code.`;
+      return `Spend at least đ${result.minSubtotal}   to use this code.`;
     default:
       return 'This code can’t be applied.';
   }
@@ -66,7 +70,7 @@ export function describeCouponError(result) {
 
 /** "20% off" / "$15 off" (+ điều kiện tối thiểu). */
 export function describeCoupon(coupon) {
-  const base = coupon.type === 'percent' ? `${coupon.value}% off` : `$${coupon.value} off`;
+  const base = coupon.type === 'percent' ? `${coupon.value}% off` : `đ${coupon.value} off`;
   return coupon.minSubtotal > 0 ? `${base} over $${coupon.minSubtotal}` : base;
 }
 
@@ -80,7 +84,7 @@ export function sanitizeCoupons(list) {
     if (!item || typeof item !== 'object') return;
 
     const code = normalizeCode(item.code);
-    const type = item.type === 'fixed' ? 'fixed' : 'percent';
+      const type = 'percent';
     const value = Number(item.value);
     if (!code || seen.has(code) || !Number.isFinite(value) || value <= 0) return;
     if (type === 'percent' && value > 100) return;
@@ -95,6 +99,9 @@ export function sanitizeCoupons(list) {
       type,
       value: round2(value),
       minSubtotal: Math.max(0, Number(item.minSubtotal) || 0),
+      maxDiscount: item.maxDiscount == null ? null : Math.max(0, Number(item.maxDiscount) || 0),
+      scope: ['all', 'category', 'brand'].includes(item.scope) ? item.scope : 'all',
+      targetValue: String(item.targetValue || ''),
       expiresAt: expires,
       active: item.active !== false,
       usageLimit: item.usageLimit === null || item.usageLimit === '' || !(limit >= 1) ? null : Math.floor(limit),

@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { getHandbags } from './api';
 
-const CACHE_KEY = '@luxebag/handbags-cache-v2'; // v2: discards caches saved with the wrong stock field
+const CACHE_KEY = '@luxebag/handbags-cache-v4'; // v4: removes stale product-level discounts
 export const STALE_MS = 60 * 1000;
 const ERROR_MESSAGE = 'Could not load handbags. Check your connection and try again.';
 

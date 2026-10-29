@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AdminHeader from '../components/AdminHeader';
-import BulkDiscountSheet from '../components/BulkDiscountSheet';
 import FilterChips from '../components/FilterChips';
 import ProductStatusBadge from '../components/ProductStatusBadge';
 import RemoteImage from '../components/RemoteImage';
@@ -29,7 +28,7 @@ const statusOf = (item) =>
 
 const idValue = (item) => new Date(item.createdAt || 0).getTime() || 0;
 
-/** Danh sách sản phẩm cho admin: tìm kiếm, lọc theo trạng thái, thêm mới, giảm giá hàng loạt. */
+/** Danh sách sản phẩm cho admin: tìm kiếm, lọc theo trạng thái và quản lý sản phẩm. */
 export default function AdminProductsScreen({ navigation }) {
   const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +36,6 @@ export default function AdminProductsScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [pulling, setPulling] = useState(false);
-  const [discountOpen, setDiscountOpen] = useState(false);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -128,14 +126,6 @@ export default function AdminProductsScreen({ navigation }) {
         right={
           <View style={styles.actions}>
             <Pressable
-              onPress={() => setDiscountOpen(true)}
-              style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Bulk discount"
-            >
-              <Ionicons name="pricetag-outline" size={20} color="#1A1A1A" />
-            </Pressable>
-            <Pressable
               onPress={() => openForm(null)}
               style={[styles.iconButton, styles.addButton]}
               accessibilityRole="button"
@@ -163,12 +153,6 @@ export default function AdminProductsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} />}
       />
 
-      <BulkDiscountSheet
-        visible={discountOpen}
-        items={allItems}
-        onClose={() => setDiscountOpen(false)}
-        onApplied={loadProducts}
-      />
     </SafeAreaView>
   );
 }

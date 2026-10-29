@@ -129,7 +129,7 @@ export default function AdminProductFormScreen({ navigation, route }) {
     if (!cost.trim() || !Number.isFinite(price) || price <= 0) next.cost = 'Enter a price above 0.';
 
     let percent = 0;
-    if (discount.trim()) {
+    if (editing && discount.trim()) {
       percent = toNumber(discount);
       if (!Number.isInteger(percent) || percent < 0 || percent > 90) {
         next.discount = 'Use a whole number from 0 to 90.';
@@ -154,7 +154,6 @@ export default function AdminProductFormScreen({ navigation, route }) {
       brand: brand.trim(),
       category: category.trim(),
       cost: price,
-      percentOff: percent / 100,
       color: colors
         .split(',')
         .map((part) => part.trim())
@@ -164,6 +163,7 @@ export default function AdminProductFormScreen({ navigation, route }) {
       imageKey,
       status,
     };
+    if (editing) payload.percentOff = percent / 100;
     // Chỉ gửi stock khi admin chủ động sửa: tránh ghi đè số lượng khách vừa mua
     if (!editing || stockChanged) payload.stock = stockValue;
 
@@ -339,25 +339,27 @@ export default function AdminProductFormScreen({ navigation, route }) {
               placeholder="0"
               keyboardType="decimal-pad"
               returnKeyType="next"
-              onSubmitEditing={() => discountRef.current?.focus()}
+              onSubmitEditing={() => (editing ? discountRef.current?.focus() : stockRef.current?.focus())}
               blurOnSubmit={false}
             />
           </View>
-          <View style={styles.col}>
-            <AuthField
-              ref={discountRef}
-              label="Discount (%)"
-              value={discount}
-              onChangeText={setDiscount}
-              error={errors.discount}
-              placeholder="0"
-              keyboardType="number-pad"
-              maxLength={2}
-              returnKeyType="next"
-              onSubmitEditing={() => stockRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-          </View>
+          {editing && (
+            <View style={styles.col}>
+              <AuthField
+                ref={discountRef}
+                label="Discount (%)"
+                value={discount}
+                onChangeText={setDiscount}
+                error={errors.discount}
+                placeholder="0"
+                keyboardType="number-pad"
+                maxLength={2}
+                returnKeyType="next"
+                onSubmitEditing={() => stockRef.current?.focus()}
+                blurOnSubmit={false}
+              />
+            </View>
+          )}
         </View>
 
         <AuthField
