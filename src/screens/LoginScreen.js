@@ -43,10 +43,15 @@ export default function LoginScreen({ navigation }) {
       await login(email, password);
       // Thành công: navigator tự bỏ màn Login và chuyển sang giao diện phù hợp với role
     } catch (error) {
+      // Tài khoản chưa xác minh email: chuyển sang màn nhập mã (không báo "Account disabled")
+      if (error?.code === 'email_not_verified') {
+        navigation.replace('VerifyEmail', { email: email.trim().toLowerCase(), sendCode: true });
+        return;
+      }
       setFormError(describeAuthError(error));
       setBusy(false);
     }
-  }, [busy, email, password, login]);
+  }, [busy, email, password, login, navigation]);
 
   return (
     <KeyboardAvoidingView

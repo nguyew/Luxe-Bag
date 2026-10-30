@@ -17,7 +17,12 @@ import SignInPrompt from '../components/SignInPrompt';
 import useAuth from '../hooks/useAuth';
 import useCart from '../hooks/useCart';
 import useHandbags from '../hooks/useHandbags';
-import { describeOrderError, placeOrder } from '../services/orderService';
+import { cancelOrder, describeOrderError, placeOrder } from '../services/orderService';
+import {
+  describePaymentError,
+  isStripeConfigured,
+  presentCardPayment,
+} from '../services/paymentService';
 import { fetchPromotions } from '../services/promotionService';
 import {
   calcCouponDiscount,
@@ -80,30 +85,92 @@ export default function CheckoutScreen({ navigation }) {
     addresses[0] ||
     null;
 
+  // Đơn thẻ chưa thanh toán mà khách đã đóng PaymentSheet / thanh toán lỗi:
+  // hủy đơn để trả lại tồn kho và mã giảm giá; giỏ hàng vẫn giữ nguyên để khách thử lại.
+  // Trả về true nếu Stripe đang xử lý tiền (không hủy được) -> cần xem trạng thái đơn.
+  const releaseUnpaidOrder = useCallback(
+    async (orderId) => {
+      let processing = false;
+      try {
+        await cancelOrder(user?.id, orderId);
+      } catch (e) {
+        processing = e?.code === 'payment_processing';
+        // Lỗi khác (đã hủy qua webhook, mất mạng...): Backend sẽ tự dọn đơn quá hạn
+      }
+      reload();
+      return processing;
+    },
+    [user, reload]
+  );
+
   const submit = useCallback(async () => {
     if (busy || !user) return;
     if (!address) {
       setError(describeOrderError({ code: 'no_address' }));
       return;
     }
+    if (method === 'card' && !isStripeConfigured()) {
+      setError(describePaymentError({ code: 'not_configured' }));
+      return;
+    }
 
     setBusy(true);
     setError('');
     setProblems([]);
+    let created = null;
     try {
-      const order = await placeOrder({
+      const { order, payment } = await placeOrder({
         userId: user.id,
         lines: cart.lines.map((line) => ({ id: line.id, qty: line.qty })),
         address,
         paymentMethod: method,
         couponCode: applied ? applied.coupon.code : undefined,
       });
+      created = order;
+      reload(); // tồn kho đã đổi -> tải lại danh sách túi
+
+      if (method === 'card') {
+        // Chỉ xóa giỏ SAU KHI PaymentSheet hoàn tất; đóng sheet hoặc lỗi thì giữ giỏ để thử lại.
+        const result = await presentCardPayment({
+          clientSecret: payment?.clientSecret,
+          name: address.fullName,
+          email: user.email,
+        });
+        if (result.status !== 'succeeded') {
+          const processing = await releaseUnpaidOrder(order.id);
+          if (processing) {
+            cart.clear();
+            navigation.replace('OrderDetail', { orderId: order.id, order, placed: true, paymentSubmitted: true });
+            return;
+          }
+          setError('Payment was not completed. Your bag is still here, so you can try again.');
+          setBusy(false);
+          return;
+        }
+        tapLight();
+        cart.clear();
+        // Chưa coi là "paid": màn chi tiết tải lại GET /api/orders/{id} đến khi webhook xác nhận
+        navigation.replace('OrderDetail', { orderId: order.id, order, placed: true, paymentSubmitted: true });
+        return;
+      }
+
       tapLight();
       cart.clear();
-      reload(); // tồn kho đã đổi -> tải lại danh sách túi
       // busy giữ nguyên để không nháy màn "giỏ trống" trước khi chuyển trang
       navigation.replace('OrderDetail', { orderId: order.id, order, placed: true });
     } catch (e) {
+      if (created) {
+        // Đơn đã tạo nhưng bước thanh toán lỗi (Stripe, mạng...)
+        const processing = await releaseUnpaidOrder(created.id);
+        if (processing) {
+          cart.clear();
+          navigation.replace('OrderDetail', { orderId: created.id, order: created, placed: true, paymentSubmitted: true });
+          return;
+        }
+        setError(`${describePaymentError(e)} Your bag is still here, so you can try again.`);
+        setBusy(false);
+        return;
+      }
       setError(describeOrderError(e));
       setProblems(e?.code === 'unavailable' ? e.details : []);
       if (e?.code === 'invalid_coupon') {
@@ -113,7 +180,7 @@ export default function CheckoutScreen({ navigation }) {
       if (e?.code === 'unavailable') reload(); // để giỏ hàng đánh dấu món có vấn đề
       setBusy(false);
     }
-  }, [busy, user, address, cart, method, applied, reload, navigation]);
+  }, [busy, user, address, cart, method, applied, reload, navigation, releaseUnpaidOrder]);
 
   const applyCoupon = useCallback(async () => {
     if (checking) return;
@@ -250,18 +317,23 @@ export default function CheckoutScreen({ navigation }) {
 
         {/* Thanh toán */}
         <Text style={styles.section}>Payment</Text>
-        {Object.entries(PAYMENT_METHODS).map(([key, info]) => (
+        {Object.entries(PAYMENT_METHODS).map(([key, info]) => {
+          const unavailable = key === 'card' && !isStripeConfigured();
+          return (
           <Pressable
             key={key}
             onPress={() => setMethod(key)}
-            style={[styles.method, method === key && styles.methodOn]}
+            disabled={unavailable}
+            style={[styles.method, method === key && styles.methodOn, unavailable && styles.methodOff]}
             accessibilityRole="radio"
-            accessibilityState={{ selected: method === key }}
+            accessibilityState={{ selected: method === key, disabled: unavailable }}
           >
             <Ionicons name={info.icon} size={22} color="#1A1A1A" />
             <View style={styles.methodText}>
               <Text style={styles.methodLabel}>{info.label}</Text>
-              <Text style={styles.methodHint}>{info.hint}</Text>
+              <Text style={styles.methodHint}>
+                {unavailable ? 'Not set up in this app yet.' : info.hint}
+              </Text>
             </View>
             <Ionicons
               name={method === key ? 'radio-button-on' : 'radio-button-off'}
@@ -269,7 +341,14 @@ export default function CheckoutScreen({ navigation }) {
               color={method === key ? '#050505' : '#B9B2AA'}
             />
           </Pressable>
-        ))}
+          );
+        })}
+        {method === 'card' && (
+          <Text style={styles.cardNote}>
+            You’ll enter your card details securely in the next step. Your bag stays here until the
+            payment succeeds.
+          </Text>
+        )}
 
         {/* Mã giảm giá */}
         <Text style={styles.section}>Discount code</Text>
@@ -473,7 +552,9 @@ export default function CheckoutScreen({ navigation }) {
           {busy ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.placeText}>Place order · {formatPrice(totals.total)}</Text>
+            <Text style={styles.placeText}>
+              {method === 'card' ? 'Pay' : 'Place order'} · {formatPrice(totals.total)}
+            </Text>
           )}
         </Pressable>
       </View>
@@ -633,6 +714,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   methodOn: { borderColor: '#050505' },
+  methodOff: { opacity: 0.5 },
+  cardNote: { marginTop: 4, marginBottom: 4, paddingHorizontal: 6, fontSize: 12, lineHeight: 17, color: '#77716A' },
   methodText: { flex: 1 },
   methodLabel: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
   methodHint: { marginTop: 2, fontSize: 12, color: '#77716A' },

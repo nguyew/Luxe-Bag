@@ -66,13 +66,39 @@ export const STATUS_ACTION_LABEL = {
   cancelled: 'Cancel order',
 };
 
-/** Khách chỉ hủy được đơn chưa được cửa hàng xác nhận. */
-export const canCancel = (order) => order?.status === 'pending';
+/**
+ * Khách chỉ hủy được đơn chưa được cửa hàng xác nhận.
+ * Đơn thẻ đang "processing" (Stripe đang xử lý) thì Backend chưa cho hủy.
+ */
+export const canCancel = (order) =>
+  order?.status === 'pending' && order?.paymentStatus !== 'processing';
 
 export const PAYMENT_METHODS = {
   cod: { label: 'Cash on delivery', hint: 'Pay when your order arrives.', icon: 'cash-outline' },
-  card: { label: 'Credit card (demo)', hint: 'Simulated payment – no real charge.', icon: 'card-outline' },
+  card: { label: 'Credit / debit card', hint: 'Pay securely with Stripe.', icon: 'card-outline' },
 };
+
+/**
+ * Trạng thái thanh toán do Backend trả về (order.paymentStatus).
+ * Chỉ webhook Stripe của Backend mới đổi sang "paid"; app không tự coi đơn là đã trả tiền.
+ */
+export const PAYMENT_STATUS = {
+  unpaid: { label: 'Pay on delivery', color: '#55514C', bg: '#E7E3DF', icon: 'cash-outline' },
+  requires_payment: { label: 'Awaiting payment', color: '#8A5A00', bg: '#FFF1D6', icon: 'time-outline' },
+  processing: { label: 'Processing payment', color: '#1F5FA8', bg: '#E1EDFB', icon: 'sync-outline' },
+  paid: { label: 'Paid', color: '#1F7A3E', bg: '#DFF3E5', icon: 'checkmark-circle-outline' },
+  failed: { label: 'Payment failed', color: '#B3261E', bg: '#FBE3E1', icon: 'close-circle-outline' },
+  refunded: { label: 'Refunded', color: '#55514C', bg: '#E7E3DF', icon: 'return-up-back-outline' },
+};
+
+export const paymentStatusMeta = (status) => PAYMENT_STATUS[status] || PAYMENT_STATUS.unpaid;
+
+/** Đơn thẻ đang chờ Backend xác nhận thanh toán (webhook) -> màn chi tiết nên tải lại định kỳ. */
+export const isPaymentPending = (order) =>
+  order?.paymentMethod === 'card' &&
+  order?.status === 'pending' &&
+  ['requires_payment', 'processing'].includes(order?.paymentStatus);
+
 
 export const paymentLabel = (method) => PAYMENT_METHODS[method]?.label || 'Unknown';
 

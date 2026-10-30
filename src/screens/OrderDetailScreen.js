@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,7 @@ import OrderTimeline from '../components/OrderTimeline';
 import RemoteImage from '../components/RemoteImage';
 import useAuth from '../hooks/useAuth';
 import useHandbags from '../hooks/useHandbags';
-import { cancelOrder, describeOrderError, getMyOrders } from '../services/orderService';
+import { cancelOrder, describeOrderError, getOrder } from '../services/orderService';
 import { formatPrice, formatBrand } from '../utils/format';
 import {
   RETURN_STATUS,
@@ -23,13 +23,15 @@ import {
   canRequestReturn,
   formatOrderCode,
   formatOrderDate,
+  isPaymentPending,
   paymentLabel,
+  paymentStatusMeta,
   returnDeadline,
 } from '../utils/orders';
 
 /** Chi tiết một đơn: trạng thái, sản phẩm, địa chỉ, thanh toán, nút hủy đơn. */
 export default function OrderDetailScreen({ navigation, route }) {
-  const { orderId, placed } = route.params || {};
+  const { orderId, placed, paymentSubmitted } = route.params || {};
   const { user } = useAuth();
   const { reload } = useHandbags();
 
@@ -44,11 +46,11 @@ export default function OrderDetailScreen({ navigation, route }) {
   const refresh = useCallback(async () => {
     if (!userId) return;
     try {
-      const list = await getMyOrders(userId);
-      const found = list.find((item) => item.id === orderId);
-      if (found) setOrder(found);
-      else setMissing(true);
-    } catch {
+      // GET /api/orders/{id}: trạng thái thật (kể cả paymentStatus do webhook Stripe cập nhật)
+      setOrder(await getOrder(orderId));
+      setMissing(false);
+    } catch (e) {
+      if (e?.code === 'not_found') setMissing(true);
       // mất mạng: giữ bản đang hiển thị
     } finally {
       setLoading(false);
@@ -61,6 +63,19 @@ export default function OrderDetailScreen({ navigation, route }) {
       refresh();
     }, [refresh])
   );
+
+  // Đơn thẻ đang chờ Backend xác nhận thanh toán: tải lại định kỳ (tối đa ~1 phút)
+  const waitingForPayment = isPaymentPending(order);
+  useEffect(() => {
+    if (!waitingForPayment) return undefined;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      refresh();
+      if (tries >= 20) clearInterval(timer);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [waitingForPayment, refresh]);
 
   const doCancel = useCallback(async () => {
     if (!userId || !order) return;
@@ -109,11 +124,15 @@ export default function OrderDetailScreen({ navigation, route }) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {placed && order.status === 'pending' && (
-        <View style={styles.success}>
-          <Ionicons name="checkmark-circle" size={22} color="#1F7A3E" />
-          <Text style={styles.successText}>Thank you! Your order has been placed.</Text>
-        </View>
+      {placed && order.paymentMethod === 'card' ? (
+        <PaymentBanner order={order} submitted={!!paymentSubmitted} />
+      ) : (
+        placed && order.status === 'pending' && (
+          <View style={styles.success}>
+            <Ionicons name="checkmark-circle" size={22} color="#1F7A3E" />
+            <Text style={styles.successText}>Thank you! Your order has been placed.</Text>
+          </View>
+        )
       )}
 
       <View style={styles.card}>
@@ -164,8 +183,11 @@ export default function OrderDetailScreen({ navigation, route }) {
       <View style={styles.card}>
         <View style={styles.payRow}>
           <Text style={styles.line}>{paymentLabel(order.paymentMethod)}</Text>
-          <Text style={styles.payStatus}>{paymentStatusText(order.paymentStatus)}</Text>
+          <PaymentChip order={order} />
         </View>
+        {order.paymentStatus === 'failed' && !!order.paymentFailureMessage && (
+          <Text style={styles.payFailure}>{order.paymentFailureMessage}</Text>
+        )}
         <View style={styles.divider} />
         <View style={styles.payRow}>
           <Text style={styles.muted}>Subtotal</Text>
@@ -241,6 +263,12 @@ export default function OrderDetailScreen({ navigation, route }) {
         </>
       )}
 
+      {order.status === 'pending' && order.paymentStatus === 'processing' && (
+        <Text style={styles.payNote}>
+          Your payment is being processed, so the order can’t be cancelled until it’s confirmed.
+        </Text>
+      )}
+
       {canCancel(order) && (
         <Pressable
           onPress={confirmCancel}
@@ -259,10 +287,56 @@ export default function OrderDetailScreen({ navigation, route }) {
   );
 }
 
-function paymentStatusText(status) {
-  if (status === 'paid') return 'Paid';
-  if (status === 'refunded') return 'Refunded';
-  return 'Pay on delivery';
+/** Nhãn trạng thái thanh toán (Awaiting payment / Processing / Paid / Failed / Refunded...). */
+function PaymentChip({ order }) {
+  const refundPending = order.paymentStatus === 'paid' && order.refundStatus === 'pending';
+  const meta = refundPending
+    ? { label: 'Refund pending', color: '#8A5A00', bg: '#FFF1D6' }
+    : paymentStatusMeta(order.paymentStatus);
+  return (
+    <View style={[styles.chip, { backgroundColor: meta.bg }]}>
+      <Text style={[styles.chipText, { color: meta.color }]}>{meta.label}</Text>
+    </View>
+  );
+}
+
+/**
+ * Thông báo sau khi thanh toán thẻ. "Paid" chỉ hiện khi Backend (webhook Stripe) đã xác nhận;
+ * ngay sau khi PaymentSheet xong thì chỉ báo đang xác nhận.
+ */
+function PaymentBanner({ order, submitted }) {
+  if (order.paymentStatus === 'paid') {
+    return (
+      <View style={styles.success}>
+        <Ionicons name="checkmark-circle" size={22} color="#1F7A3E" />
+        <Text style={styles.successText}>Payment confirmed. Thank you for your order!</Text>
+      </View>
+    );
+  }
+  if (order.paymentStatus === 'failed') {
+    return (
+      <View style={[styles.success, styles.bannerFail]}>
+        <Ionicons name="close-circle" size={22} color="#B3261E" />
+        <Text style={[styles.successText, styles.bannerFailText]}>
+          {order.paymentFailureMessage || 'The payment was not completed.'} This order was
+          cancelled — go back to your bag to try again.
+        </Text>
+      </View>
+    );
+  }
+  if (isPaymentPending(order)) {
+    return (
+      <View style={[styles.success, styles.bannerWait]}>
+        <ActivityIndicator size="small" color="#1F5FA8" />
+        <Text style={[styles.successText, styles.bannerWaitText]}>
+          {submitted
+            ? 'Payment submitted. We’re confirming it with the bank — this usually takes a few seconds.'
+            : 'Waiting for your payment to be confirmed.'}
+        </Text>
+      </View>
+    );
+  }
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -350,7 +424,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  payStatus: { fontSize: 12, fontWeight: '700', color: '#1F7A3E' },
+  chip: { paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: 'center' },
+  chipText: { fontSize: 12, fontWeight: '700' },
+  payFailure: { marginTop: 8, fontSize: 12, lineHeight: 17, color: '#B3261E' },
+  payNote: { marginTop: 12, fontSize: 12, lineHeight: 17, textAlign: 'center', color: '#77716A' },
+  bannerFail: { backgroundColor: '#FBE3E1' },
+  bannerFailText: { color: '#B3261E' },
+  bannerWait: { backgroundColor: '#E1EDFB' },
+  bannerWaitText: { color: '#1F5FA8' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 10, backgroundColor: '#D8D2CC' },
   muted: { fontSize: 13, color: '#77716A' },
   value: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },

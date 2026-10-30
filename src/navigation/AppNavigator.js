@@ -31,6 +31,7 @@ import AddressFormScreen from '../screens/AddressFormScreen';
 import OrdersScreen from '../screens/OrdersScreen';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
 import PurchasedBagsScreen from '../screens/PurchasedBagsScreen';
+import VerifyEmailScreen from '../screens/VerifyEmailScreen';
 import { getSnapshot as getCartSnapshot, subscribe as subscribeCart } from '../services/cartService';
 import useAuth from '../hooks/useAuth';
 
@@ -329,6 +330,7 @@ export default function AppNavigator() {
         <Stack.Group screenOptions={{ presentation: 'modal', headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
         </Stack.Group>
       )}
     </Stack.Navigator>

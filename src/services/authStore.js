@@ -14,8 +14,10 @@ import {
   getUserById,
   loginUser,
   registerUser,
+  resendVerificationCode,
   setUserAddresses,
   updateUser,
+  verifyEmailCode,
 } from './userService';
 import { setCartOwner } from './cartService';
 import { setFavoritesOwner } from './favoriteService';
@@ -121,11 +123,24 @@ export async function login(email, password) {
   return startSession(session.user);
 }
 
-/** Đăng ký rồi đăng nhập luôn. */
+/**
+ * Đăng ký tài khoản. Backend yêu cầu xác minh email nên KHÔNG đăng nhập ở bước này:
+ * trả về { email, alreadyPending } để màn hình chuyển sang VerifyEmail.
+ */
 export async function register({ name, email, password }) {
-  const session = await registerUser({ name, email, password });
+  return registerUser({ name, email, password });
+}
+
+/** Xác minh email bằng mã 6 số; thành công thì đăng nhập luôn. */
+export async function verifyEmail(email, code) {
+  const session = await verifyEmailCode(email, code);
   await setAuthToken(session.token);
   return startSession(session.user);
+}
+
+/** Xin mã xác minh mới qua email. */
+export async function resendVerification(email) {
+  return resendVerificationCode(email);
 }
 
 export async function logout() {

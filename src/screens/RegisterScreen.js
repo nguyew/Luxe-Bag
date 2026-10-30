@@ -56,8 +56,9 @@ export default function RegisterScreen({ navigation }) {
 
     setBusy(true);
     try {
-      await register({ name, email, password });
-      // Thành công: đã đăng nhập sẵn, navigator tự bỏ màn Register
+      // Backend gửi mã 6 số qua email, chưa đăng nhập: chuyển sang màn xác minh
+      const result = await register({ name, email, password });
+      navigation.replace('VerifyEmail', { email: result.email, sendCode: result.alreadyPending });
     } catch (error) {
       if (error?.code === 'email_taken') {
         setErrors({ email: describeAuthError(error) });
@@ -66,7 +67,7 @@ export default function RegisterScreen({ navigation }) {
       }
       setBusy(false);
     }
-  }, [busy, name, email, password, confirm, register]);
+  }, [busy, name, email, password, confirm, register, navigation]);
 
   return (
     <KeyboardAvoidingView

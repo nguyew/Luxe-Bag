@@ -43,6 +43,10 @@ export function describeOrderError(error) {
       return 'This order status can no longer be changed that way. It may have been updated already.';
     case 'not_cancellable':
       return 'This order can no longer be cancelled because the store has already processed it.';
+    case 'payment_processing':
+      return 'The payment is still processing, so the order cannot be cancelled yet. Please check again in a moment.';
+    case 'payment_not_configured':
+      return 'Card payments are not available right now. Please choose cash on delivery or try again later.';
     case 'timeout':
       return 'The server took too long to respond. Please try again.';
     case 'network':
@@ -58,6 +62,7 @@ function toOrderError(error) {
   const code = data.code || data.details?.code
     || (error?.status === 404 ? 'not_found' : null)
     || (error?.status === 409 ? 'unavailable' : null)
+    || (error?.status === 503 ? 'payment_not_configured' : null)
     || (error?.code === 'timeout' ? 'timeout' : null)
     || 'network';
   return new OrderError(code, data.error || data.message || error?.message, details);
@@ -74,6 +79,11 @@ function sortNewestFirst(orders) {
  * `userId` is retained for compatibility with CheckoutScreen but is not sent:
  * the server derives the customer identity from the JWT.
  * lines: [{ id, qty }], address: { fullName, phone, line1, city }.
+ *
+ * Resolves to { order, payment }. For paymentMethod "card", `payment` is
+ * { provider: 'stripe', clientSecret } and the order is `pending` /
+ * `requires_payment` until Stripe confirms through the Backend webhook.
+ * For cash on delivery `payment` is null.
  */
 export async function placeOrder({ userId: _userId, lines, address, paymentMethod, couponCode }) {
   if (!Array.isArray(lines) || lines.length === 0) throw new OrderError('empty');
@@ -94,6 +104,17 @@ export async function placeOrder({ userId: _userId, lines, address, paymentMetho
       paymentMethod,
       ...(couponCode ? { couponCode } : {}),
     });
+    if (!response?.order) throw new Error('Unexpected response from the server.');
+    return { order: response.order, payment: response.payment || null };
+  } catch (error) {
+    throw toOrderError(error);
+  }
+}
+
+/** Fetch one of the customer's orders (GET /api/orders/{id}) to read its latest status. */
+export async function getOrder(orderId) {
+  try {
+    const response = await backendApi.get(`api/orders/${encodeURIComponent(orderId)}`);
     if (!response?.order) throw new Error('Unexpected response from the server.');
     return response.order;
   } catch (error) {

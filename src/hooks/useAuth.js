@@ -8,6 +8,8 @@ import {
   saveAddresses,
   subscribe,
   updateAccount,
+  resendVerification,
+  verifyEmail
 } from '../services/authStore';
 
 /**
@@ -32,6 +34,8 @@ export default function useAuth() {
       logout,
       updateAccount,
       saveAddresses,
+      resendVefication,
+      verfifyEmail
     }),
     [snapshot]
   );

@@ -16,6 +16,7 @@ import SignInPrompt from '../components/SignInPrompt';
 import useAuth from '../hooks/useAuth';
 import { describeOrderError, getMyOrders } from '../services/orderService';
 import { formatPrice } from '../utils/format';
+import { paymentStatusMeta } from '../utils/orders';
 import { formatOrderCode, formatOrderDate } from '../utils/orders';
 
 /** Danh sách đơn hàng của tôi (mới nhất trước). */
@@ -135,6 +136,11 @@ const OrderRow = React.memo(function OrderRow({ order, onPress }) {
   const items = Array.isArray(order.items) ? order.items : [];
   const count = items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
   const extra = items.length - 3;
+  // Chỉ hiện nhãn thanh toán khi đơn thẻ cần chú ý (chờ trả tiền, đang xử lý, thất bại, đã hoàn tiền)
+  const payment = paymentStatusMeta(order.paymentStatus);
+  const showPayment =
+    order.paymentMethod === 'card' &&
+    ['requires_payment', 'processing', 'failed', 'refunded'].includes(order.paymentStatus);
 
   return (
     <Pressable
@@ -150,6 +156,12 @@ const OrderRow = React.memo(function OrderRow({ order, onPress }) {
         </View>
         <OrderStatusBadge status={order.status} />
       </View>
+
+      {showPayment && (
+        <View style={[styles.payChip, { backgroundColor: payment.bg }]}>
+          <Text style={[styles.payChipText, { color: payment.color }]}>{payment.label}</Text>
+        </View>
+      )}
 
       <View style={styles.thumbs}>
         {items.slice(0, 3).map((item) => (
@@ -197,6 +209,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  payChip: { alignSelf: 'flex-start', paddingHorizontal: 10, height: 24, borderRadius: 12, justifyContent: 'center', marginTop: 10 },
+  payChipText: { fontSize: 12, fontWeight: '700' },
   card: { padding: 16, marginBottom: 12, borderRadius: 24, backgroundColor: '#FFFFFF' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   orderId: { fontSize: 14, fontWeight: '800', letterSpacing: 0.3, color: '#0D0D0D' },

@@ -2,6 +2,7 @@
   "expo": {
     "name": "LuxeBag",
     "slug": "LuxeBag",
+    "scheme": "luxebag",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -36,7 +37,8 @@
           "cameraPermission": "LuxeBag uses your camera so you can take a profile picture.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "@stripe/stripe-react-native"
     ]
   }
 }

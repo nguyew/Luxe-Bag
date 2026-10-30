@@ -32,6 +32,20 @@ export function describeAuthError(error) {
       return 'This account has been disabled. Please contact support.';
     case 'email_taken':
       return 'An account with this email already exists.';
+    case 'email_not_verified':
+      return 'Please verify your email before signing in.';
+    case 'invalid_verification_code':
+      return 'That code isn’t correct. Check your email and try again.';
+    case 'verification_expired':
+      return 'This code has expired. Tap “Resend code” to get a new one.';
+    case 'verification_locked':
+      return 'Too many incorrect attempts. Tap “Resend code” to get a new one.';
+    case 'email_already_verified':
+      return 'This email is already verified. Please sign in.';
+    case 'rate_limited':
+      return error.message || 'Too many attempts. Please wait a moment and try again.';
+    case 'email_unavailable':
+      return 'We couldn’t send the verification email right now. Please try again in a moment.';
     case 'invalid_input':
       return error.message;
     case 'network':
@@ -55,12 +69,22 @@ export function toPublicUser(record) {
     createdAt: record.createdAt || null,
     addresses: Array.isArray(record.addresses) ? record.addresses : [],
     avatarUrl: String(record.avatarUrl || ''),
+    // Backend: tài khoản mới phải xác minh email trước khi đăng nhập
+    emailVerified: record.emailVerified !== false,
   };
 }
 
 // Mọi lỗi không phải AuthError (mất mạng, quá hạn, 5xx...) đều quy về 'network'
 function asAuthError(error) {
   if (error instanceof AuthError) return error;
+  // Backend gắn mã lỗi cụ thể (ví dụ email_not_verified) trong body: ưu tiên mã đó
+  const serverCode = error?.data?.code;
+  if (serverCode === 'email_not_verified') {
+    return new AuthError('email_not_verified', error?.data?.error);
+  }
+  if (error?.status === 429) {
+    return new AuthError('rate_limited', error?.data?.error || error?.message);
+  }
   if (error?.status === 400) {
     const details = error?.data?.details;
     const message = Array.isArray(details) ? details.join(' ') : (error?.data?.error || error?.message);
@@ -72,7 +96,12 @@ function asAuthError(error) {
   return new AuthError('network', error?.message);
 }
 
-/** Đăng ký tài khoản khách hàng mới. Trả về user công khai. */
+/**
+ * Đăng ký tài khoản khách hàng mới.
+ * Backend gửi mã 6 số qua email và KHÔNG đăng nhập ngay: trả về { email } để
+ * chuyển sang màn xác minh. Nếu email đã đăng ký nhưng chưa xác minh thì trả thêm
+ * `alreadyPending: true` (người dùng cần xin mã mới).
+ */
 export async function registerUser({ name, email, password }) {
   const invalid =
     validateName(name) || validateEmail(email) || validatePassword(password);
@@ -84,10 +113,54 @@ export async function registerUser({ name, email, password }) {
       email: normalizeEmail(email),
       password,
     });
-    if (!response?.user) throw new Error('Unexpected response from the server.');
+    if (!response?.verificationRequired) throw new Error('Unexpected response from the server.');
+    return { email: normalizeEmail(response.email || email), alreadyPending: false };
+  } catch (error) {
+    if (error?.status === 409) {
+      if (error?.data?.code === 'email_not_verified') {
+        return { email: normalizeEmail(email), alreadyPending: true };
+      }
+      throw new AuthError('email_taken');
+    }
+    // Backend không gửi được email thì xóa tài khoản vừa tạo và trả lỗi 5xx
+    if (error?.status >= 500) throw new AuthError('email_unavailable');
+    throw asAuthError(error);
+  }
+}
+
+/** Xác minh email bằng mã 6 số. Thành công trả về { user, token } để đăng nhập luôn. */
+export async function verifyEmailCode(email, code) {
+  const digits = String(code ?? '').replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(digits)) {
+    throw new AuthError('invalid_input', 'Enter the 6-digit code from your email.');
+  }
+  try {
+    const response = await backendApi.post(`${AUTH_ENDPOINT}/verify-email`, {
+      email: normalizeEmail(email),
+      code: digits,
+    });
+    if (!response?.user || !response?.token) throw new Error('Unexpected response from the server.');
     return { user: toPublicUser(response.user), token: response.token };
   } catch (error) {
-    if (error?.status === 409) throw new AuthError('email_taken');
+    const serverCode = error?.data?.code;
+    if (
+      ['invalid_verification_code', 'verification_expired', 'verification_locked', 'email_already_verified']
+        .includes(serverCode)
+    ) {
+      throw new AuthError(serverCode, error?.data?.error);
+    }
+    throw asAuthError(error);
+  }
+}
+
+/** Gửi lại mã xác minh. Backend giới hạn 1 lần/phút nên có thể trả lỗi rate_limited. */
+export async function resendVerificationCode(email) {
+  try {
+    await backendApi.post(`${AUTH_ENDPOINT}/resend-verification`, {
+      email: normalizeEmail(email),
+    });
+  } catch (error) {
+    if (error?.status >= 500) throw new AuthError('email_unavailable');
     throw asAuthError(error);
   }
 }
@@ -106,7 +179,12 @@ export async function loginUser(email, password) {
     return { user: toPublicUser(response.user), token: response.token };
   } catch (error) {
     if (error?.status === 401) throw new AuthError('invalid_credentials');
-    if (error?.status === 403) throw new AuthError('disabled');
+    // 403 có hai nghĩa: chưa xác minh email (có code) hoặc tài khoản bị vô hiệu hóa
+    if (error?.status === 403) {
+      throw error?.data?.code === 'email_not_verified'
+        ? new AuthError('email_not_verified', error?.data?.error)
+        : new AuthError('disabled');
+    }
     throw asAuthError(error);
   }
 }
