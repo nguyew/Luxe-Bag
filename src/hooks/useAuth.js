@@ -34,8 +34,8 @@ export default function useAuth() {
       logout,
       updateAccount,
       saveAddresses,
-      resendVefication,
-      verfifyEmail
+      resendVerification,
+      verifyEmail
     }),
     [snapshot]
   );

@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AdminHeader from '../components/AdminHeader';
 import FilterChips from '../components/FilterChips';
 import OrderStatusBadge from '../components/OrderStatusBadge';
+import PaymentStatusChip from '../components/PaymentStatusChip';
 import SearchBox from '../components/SearchBox';
 import useAdminUsers from '../hooks/useAdminUsers';
 import { flattenOrders, orderCountsByStatus, returnRequestCount } from '../utils/admin';
@@ -155,10 +156,12 @@ const OrderRow = React.memo(function OrderRow({ order, onPress }) {
         </View>
       )}
       <View style={styles.bottom}>
-        <Text style={styles.count}>
-          {count} {count === 1 ? 'item' : 'items'} ·{' '}
-          {order.paymentStatus === 'paid' ? 'Paid' : order.paymentStatus === 'refunded' ? 'Refunded' : 'Pay on delivery'}
-        </Text>
+        <View style={styles.bottomLeft}>
+          <Text style={styles.count}>
+            {count} {count === 1 ? 'item' : 'items'}
+          </Text>
+          <PaymentStatusChip order={order} />
+        </View>
         <Text style={styles.total}>{formatPrice(order.total)}</Text>
       </View>
     </Pressable>
@@ -201,6 +204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
   },
+  bottomLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   count: { fontSize: 12, color: '#77716A' },
   total: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3, color: '#0D0D0D' },
 });

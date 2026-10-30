@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import OrderTimeline from '../components/OrderTimeline';
+import PaymentStatusChip from '../components/PaymentStatusChip';
 import RemoteImage from '../components/RemoteImage';
 import TextPromptModal from '../components/TextPromptModal';
 import useHandbags from '../hooks/useHandbags';
@@ -251,14 +252,32 @@ export default function AdminOrderDetailScreen({ route }) {
       <View style={styles.card}>
         <View style={styles.payRow}>
           <Text style={styles.line}>{paymentLabel(order.paymentMethod)}</Text>
-          <Text style={styles.payStatus}>
-            {order.paymentStatus === 'paid'
-              ? 'Paid'
-              : order.paymentStatus === 'refunded'
-              ? 'Refunded'
-              : 'Unpaid'}
-          </Text>
+          <PaymentStatusChip order={order} />
         </View>
+        {order.paymentMethod === 'card' &&
+          order.status === 'pending' &&
+          order.paymentStatus === 'requires_payment' && (
+            <Text style={styles.payNote}>
+              Waiting for the customer’s card payment. The order can only be confirmed once it is paid.
+            </Text>
+          )}
+        {order.paymentMethod === 'card' &&
+          order.status === 'pending' &&
+          order.paymentStatus === 'processing' && (
+            <Text style={styles.payNote}>
+              The card payment is processing. Wait for Stripe to confirm it before changing this order.
+            </Text>
+          )}
+        {order.paymentStatus === 'failed' && (
+          <Text style={[styles.payNote, styles.payNoteError]}>
+            {order.paymentFailureMessage || 'The card payment was not completed.'}
+          </Text>
+        )}
+        {order.refundStatus === 'failed' && (
+          <Text style={[styles.payNote, styles.payNoteError]}>
+            The refund failed. Check this payment in the Stripe dashboard.
+          </Text>
+        )}
         <View style={styles.divider} />
         <View style={styles.payRow}>
           <Text style={styles.muted}>Subtotal</Text>
@@ -377,7 +396,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  payStatus: { fontSize: 12, fontWeight: '700', color: '#1F7A3E' },
+  payNote: { marginTop: 4, marginBottom: 2, fontSize: 12, lineHeight: 17, color: '#77716A' },
+  payNoteError: { color: '#B3261E' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 10, backgroundColor: '#D8D2CC' },
   muted: { fontSize: 13, color: '#77716A' },
   value: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },

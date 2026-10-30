@@ -93,6 +93,29 @@ export const PAYMENT_STATUS = {
 
 export const paymentStatusMeta = (status) => PAYMENT_STATUS[status] || PAYMENT_STATUS.unpaid;
 
+/**
+ * Nhãn thanh toán của MỘT đơn (dùng cho màn Admin).
+ * paymentStatusMeta chỉ nhìn trạng thái nên 'unpaid' luôn là "Pay on delivery" — đúng cho đơn COD
+ * nhưng sai cho đơn thẻ. Hàm này xét thêm phương thức thanh toán và trạng thái đơn.
+ */
+export function orderPaymentMeta(order) {
+  const status = order?.paymentStatus;
+  const isCard = order?.paymentMethod === 'card';
+
+  if (status === 'paid' && order?.refundStatus === 'pending') {
+    return { label: 'Refund pending', color: '#8A5A00', bg: '#FFF1D6', icon: 'time-outline' };
+  }
+  // Đơn thẻ đã bị hủy trước khi trả tiền (webhook "failed" có thể chưa tới)
+  if (isCard && order?.status === 'cancelled' && status === 'requires_payment') {
+    return { label: 'Payment cancelled', color: '#55514C', bg: '#E7E3DF', icon: 'close-circle-outline' };
+  }
+  // Đơn thẻ mà chưa trả tiền không bao giờ là "Pay on delivery"
+  if (isCard && (!status || status === 'unpaid')) {
+    return { label: 'Unpaid', color: '#8A5A00', bg: '#FFF1D6', icon: 'time-outline' };
+  }
+  return paymentStatusMeta(status);
+}
+
 /** Đơn thẻ đang chờ Backend xác nhận thanh toán (webhook) -> màn chi tiết nên tải lại định kỳ. */
 export const isPaymentPending = (order) =>
   order?.paymentMethod === 'card' &&
