@@ -79,7 +79,15 @@ const login = async (req, res) => {
     return res.status(403).json({ error: "This account is disabled." });
   }
 
-  if (emailVerificationEnabled && !user.emailVerifiedAt) {
+  // Seeded demo accounts are pre-approved for classroom/demo use.
+  // Keep email verification enabled for all real accounts.
+  const demoAccountEmails = new Set([
+    "admin@luxebag.com",
+    "customer@luxebag.com",
+  ]);
+  const isDemoAccount = demoAccountEmails.has(user.email);
+
+  if (emailVerificationEnabled && !user.emailVerifiedAt && !isDemoAccount) {
     return res.status(403).json({
       error: "Please verify your email before signing in.",
       code: "email_not_verified",
