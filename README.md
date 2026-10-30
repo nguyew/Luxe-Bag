@@ -89,6 +89,35 @@ Development accounts created by `npm run seed` (change these before deploying an
 | Admin | `admin@luxebag.com` | `Admin@123` |
 | Customer | `customer@luxebag.com` | `Customer@123` |
 
+### Test card payments
+
+For local development, configure Stripe with test keys (`pk_test_...` and
+`sk_test_...`). Sign in with the seeded customer account above, add a product
+to the cart, and select **Credit / debit card** at checkout.
+
+Use Stripe's test card details—not a real credit card:
+
+| Field | Value |
+|---|---|
+| Card number | `4242 4242 4242 4242` |
+| Expiry date | Any future date |
+| CVC | Any 3 digits |
+| ZIP / postal code | Any valid value |
+
+Useful Stripe test cases:
+
+| Card number | Expected result |
+|---|---|
+| `4000 0000 0000 9995` | Payment is declined |
+| `4000 0025 0000 3155` | Requires 3D Secure authentication |
+
+For card payments, the app also needs
+`EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...` in the root `.env` or
+`.env.local`, while the backend needs `STRIPE_SECRET_KEY=sk_test_...` and
+`STRIPE_WEBHOOK_SECRET` in `Backend/.env`. Restart Expo with `npx expo start -c`
+and restart the backend after changing environment variables. Never use real
+card numbers with Stripe test keys.
+
 More backend details: [Backend/README.md](Backend/README.md).
 
 ### 2. Expo app (repository root)
@@ -185,8 +214,9 @@ Backend/
 
 ## Known Limitations
 
-- Payments and refunds are **simulated**: only statuses are recorded and there is no payment gateway. Returns apply to the
-  whole order; partial returns are not supported.
+- Card payments use Stripe PaymentSheet in test or live mode; the backend webhook
+  is the source of truth for payment status. Returns apply to the whole order;
+  partial returns are not supported.
 - Email verification is not enabled yet.
 - The API currently allows any CORS origin (`*`). Restrict it before a public deployment.
 - `Backend/scripts/seed-mongodb.js` predates the current models. Rely on it for the two development accounts only; it also

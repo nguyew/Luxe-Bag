@@ -249,7 +249,7 @@ export default function AdminCouponFormScreen({ navigation, route }) {
           blurOnSubmit={false}
         />
         <AuthField
-          label="Maximum discount ($, optional)"
+          label="Maximum discount (đ, optional)"
           value={maxDiscount}
           onChangeText={setMaxDiscount}
           error={errors.maxDiscount}
@@ -258,7 +258,7 @@ export default function AdminCouponFormScreen({ navigation, route }) {
         />
         <AuthField
           ref={minRef}
-          label="Minimum order ($, optional)"
+          label="Minimum order (đ, optional)"
           value={minSubtotal}
           onChangeText={setMinSubtotal}
           error={errors.minSubtotal}

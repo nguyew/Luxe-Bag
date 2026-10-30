@@ -7,7 +7,10 @@ const {
   cancelPaymentIntent,
   createPaymentIntent,
 } = require('../services/stripeService');
-const { refundOrderPayment } = require('../services/orderPaymentService');
+const {
+  reconcilePaymentIntent,
+  refundOrderPayment,
+} = require('../services/orderPaymentService');
 const { releaseOrderResources } = require('../services/orderResourceService');
 const { paymentTimeoutMinutes } = require('../config/env');
 const { getActivePromotions, round2: roundPrice, selectPromotion } = require('../services/pricingService');
@@ -324,6 +327,14 @@ const getMyOrder = async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid order id.' });
   const order = await Order.findOne({ _id: req.params.id, userId: req.user._id });
   if (!order) return res.status(404).json({ error: 'Order not found.', code: 'not_found' });
+  if (order.paymentMethod === 'card' && ['requires_payment', 'processing'].includes(order.paymentStatus)) {
+    try {
+      await reconcilePaymentIntent(order);
+    } catch (error) {
+      // The webhook remains authoritative when Stripe is temporarily unavailable.
+      console.warn(`Could not reconcile payment for order ${order.orderNumber}:`, error.message);
+    }
+  }
   return res.json({ order: serializeOrder(order) });
 };
 

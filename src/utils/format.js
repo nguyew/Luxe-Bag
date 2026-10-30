@@ -3,6 +3,19 @@ export const formatPrice = (price) =>
     maximumFractionDigits: 0,
   })}`;
 
+export const formatCompactPrice = (price) => {
+  const value = Number(price);
+  if (!Number.isFinite(value)) return '₫0';
+
+  const absoluteValue = Math.abs(value);
+  const suffix = absoluteValue >= 1e9 ? 'B' : absoluteValue >= 1e6 ? 'M' : '';
+  const divisor = suffix === 'B' ? 1e9 : suffix === 'M' ? 1e6 : 1;
+
+  if (!suffix) return formatPrice(value);
+
+  return `₫${(value / divisor).toFixed(1).replace(/\.0$/, '')}${suffix}`;
+};
+
 export const formatOriginalPrice = (item) => {
   const original = Number(item?.originalCost);
   const current = Number(item?.cost);

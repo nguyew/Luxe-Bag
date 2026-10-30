@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { formatPrice } from '../utils/format';
+import { formatCompactPrice, formatPrice } from '../utils/format';
 
 const CHART_HEIGHT = 140;
 
@@ -29,7 +29,7 @@ export default function BarChart({ data }) {
           return (
             <View key={`${item.label}-${index}`} style={styles.col}>
               <Text style={styles.value} numberOfLines={1}>
-                {isMax ? formatPrice(item.value) : ''}
+                {isMax ? formatCompactPrice(item.value) : ''}
               </Text>
               <View style={[styles.bar, { height }, isMax && styles.barMax]} />
             </View>

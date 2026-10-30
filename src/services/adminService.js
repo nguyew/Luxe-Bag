@@ -11,6 +11,7 @@
  */
 import { backendApi, BACKEND_URL } from './api';
 import { getAuthToken } from './authToken';
+import { File } from 'expo-file-system';
 import { removeHandbag, upsertHandbag } from './handbagStore';
 import { OrderError } from './orderService';
 import { toPublicUser } from './userService';
@@ -27,7 +28,13 @@ export async function uploadProductImage(uri, contentType) {
   if (!BACKEND_URL) {
     throw new Error('Missing EXPO_PUBLIC_BACKEND_URL. Add it to your .env file and restart Expo.');
   }
-  const image = await (await fetch(uri)).blob();
+  const file = new File(uri);
+  const declaredType = String(contentType || file.type || '').toLowerCase();
+  const normalizedType = declaredType === 'image/jpg' ? 'image/jpeg' : declaredType;
+  const supportedType = ['image/jpeg', 'image/png', 'image/webp'].includes(normalizedType)
+    ? normalizedType
+    : 'image/jpeg';
+  const image = await file.arrayBuffer();
   const token = await getAuthToken();
   const response = await fetch(
     `${BACKEND_URL}/api/admin/products/image-upload/proxy`,
@@ -36,7 +43,7 @@ export async function uploadProductImage(uri, contentType) {
       headers: {
         Accept: 'application/json',
         Authorization: 'Bearer ' + token,
-        'Content-Type': contentType,
+        'Content-Type': supportedType,
       },
       body: image,
     }

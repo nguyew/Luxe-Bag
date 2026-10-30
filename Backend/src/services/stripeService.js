@@ -59,6 +59,10 @@ async function cancelPaymentIntent(order) {
   );
 }
 
+async function retrievePaymentIntent(paymentIntentId) {
+  return getStripe().paymentIntents.retrieve(paymentIntentId);
+}
+
 async function refundPayment(order) {
   if (order.paymentMethod !== 'card' || order.paymentStatus !== 'paid') return null;
   if (!order.paymentIntentId) {
@@ -92,6 +96,7 @@ module.exports = {
   cancelPaymentIntent,
   constructWebhookEvent,
   createPaymentIntent,
+  retrievePaymentIntent,
   refundPayment,
   toMinorUnits,
 };

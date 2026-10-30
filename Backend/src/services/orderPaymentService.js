@@ -1,4 +1,4 @@
-const { refundPayment } = require('./stripeService');
+const { refundPayment, retrievePaymentIntent } = require('./stripeService');
 
 function applyRefundState(order, refund) {
   order.refundId = refund.id;
@@ -32,4 +32,44 @@ async function refundOrderPayment(order) {
   return refund;
 }
 
-module.exports = { applyRefundState, refundOrderPayment };
+/**
+ * Reconcile a pending card order when the webhook has not reached the API yet.
+ * The authenticated order endpoint uses this as a fallback; webhook handling
+ * remains the normal source of payment state changes.
+ */
+async function reconcilePaymentIntent(order) {
+  if (
+    order.paymentMethod !== 'card'
+    || order.status !== 'pending'
+    || !order.paymentIntentId
+    || !['requires_payment', 'processing'].includes(order.paymentStatus)
+  ) {
+    return false;
+  }
+
+  const intent = await retrievePaymentIntent(order.paymentIntentId);
+  if (intent.id !== order.paymentIntentId) return false;
+
+  if (intent.status === 'succeeded') {
+    order.paymentStatus = 'paid';
+    order.paymentCompletedAt = new Date();
+    order.paymentExpiresAt = null;
+    order.paymentFailureMessage = '';
+    await order.save();
+    return true;
+  }
+
+  if (intent.status === 'processing' && order.paymentStatus === 'requires_payment') {
+    order.paymentStatus = 'processing';
+    await order.save();
+    return true;
+  }
+
+  return false;
+}
+
+module.exports = {
+  applyRefundState,
+  reconcilePaymentIntent,
+  refundOrderPayment,
+};

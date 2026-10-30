@@ -491,7 +491,7 @@ router.post('/products/image-upload', asyncHandler(createImageUpload));
  */
 router.post(
   '/products/image-upload/proxy',
-  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '10mb' }),
+  express.raw({ type: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'], limit: '10mb' }),
   asyncHandler(uploadImageProxy)
 );
 router.post('/products/:id/images', asyncHandler(addProductImage));
