@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AuthField from '../components/AuthField';
 import { fetchAdminPromotions, updateCoupons } from '../services/promotionService';
+import { confirmAction, showMessage } from '../utils/confirm';
 import { normalizeCode } from '../utils/coupons';
 import { formatOrderDate } from '../utils/orders';
 
@@ -167,28 +167,27 @@ export default function AdminCouponFormScreen({ navigation, route }) {
       navigation.goBack();
     } catch {
       setBusy(false);
-      Alert.alert('Discount code', 'Could not save the code. Please try again.');
+      showMessage('Discount code', 'Could not save the code. Please try again.');
     }
   }, [busy, code, value, minSubtotal, maxDiscount, usageLimit, expiry, active, existing, editing, couponId, allCodes, navigation]);
 
   const remove = useCallback(() => {
-    Alert.alert('Delete this code?', 'Orders that already used it are not affected.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setBusy(true);
-          try {
-            await updateCoupons((list) => list.filter((item) => item.id !== couponId));
-            navigation.goBack();
-          } catch {
-            setBusy(false);
-            Alert.alert('Discount code', 'Could not delete the code. Please try again.');
-          }
-        },
+    confirmAction({
+      title: 'Delete this code?',
+      message: 'Orders that already used it are not affected.',
+      confirmText: 'Delete',
+      destructive: true,
+      onConfirm: async () => {
+        setBusy(true);
+        try {
+          await updateCoupons((list) => list.filter((item) => item.id !== couponId));
+          navigation.goBack();
+        } catch {
+          setBusy(false);
+          showMessage('Discount code', 'Could not delete the code. Please try again.');
+        }
       },
-    ]);
+    });
   }, [couponId, navigation]);
 
   if (!loaded) {

@@ -25,6 +25,7 @@ import {
   nextStatuses,
   paymentLabel,
 } from '../utils/orders';
+import { showMessage } from '../utils/confirm';
 
 /** Chi tiết một đơn cho admin: xem thông tin và chuyển trạng thái. */
 export default function AdminOrderDetailScreen({ route }) {
@@ -57,7 +58,7 @@ export default function AdminOrderDetailScreen({ route }) {
         setOrder((current) => ({ ...current, ...updated }));
         if (nextStatus === 'cancelled') reload(); // tồn kho đã được hoàn lại
       } catch (error) {
-        Alert.alert('Order', describeOrderError(error));
+        showMessage('Order', describeOrderError(error));
         if (error?.code === 'invalid_transition') refreshOrder();
       } finally {
         setBusy(null);
@@ -74,7 +75,7 @@ export default function AdminOrderDetailScreen({ route }) {
         setOrder((current) => ({ ...current, ...updated }));
         if (decision === 'approve' && options?.restock) reload(); // kho đã được cộng lại
       } catch (error) {
-        Alert.alert('Return', describeOrderError(error));
+        showMessage('Return', describeOrderError(error));
         if (error?.code === 'invalid_return') refreshOrder();
       } finally {
         setReturnBusy(null);

@@ -13,6 +13,7 @@ import { formatPrice } from '../utils/format';
 const MANAGE_LINKS = [
   { route: 'AdminReports', label: 'Sales report', icon: 'bar-chart-outline' },
   { route: 'AdminReviews', label: 'Review moderation', icon: 'chatbubble-ellipses-outline' },
+  { route: 'AdminCampaigns', label: 'Promotions', icon: 'megaphone-outline' },
   { route: 'AdminPromotions', label: 'Discount codes', icon: 'pricetag-outline' },
   { route: 'AdminTaxonomy', label: 'Brands & categories', icon: 'layers-outline' },
 ];

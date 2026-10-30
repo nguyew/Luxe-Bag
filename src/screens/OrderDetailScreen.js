@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import RemoteImage from '../components/RemoteImage';
 import useAuth from '../hooks/useAuth';
 import useHandbags from '../hooks/useHandbags';
 import { cancelOrder, describeOrderError, getOrder } from '../services/orderService';
+import { confirmAction, showMessage } from '../utils/confirm';
 import { formatPrice, formatBrand } from '../utils/format';
 import {
   RETURN_STATUS,
@@ -85,7 +85,7 @@ export default function OrderDetailScreen({ navigation, route }) {
       setOrder(updated);
       reload(); // tồn kho đã được hoàn lại
     } catch (e) {
-      Alert.alert('Cancel order', describeOrderError(e));
+      showMessage('Cancel order', describeOrderError(e));
       if (e?.code === 'not_cancellable') refresh(); // lấy trạng thái mới nhất
     } finally {
       setCancelling(false);
@@ -93,10 +93,14 @@ export default function OrderDetailScreen({ navigation, route }) {
   }, [userId, order, reload, refresh]);
 
   const confirmCancel = () => {
-    Alert.alert('Cancel this order?', 'This cannot be undone.', [
-      { text: 'Keep order', style: 'cancel' },
-      { text: 'Cancel order', style: 'destructive', onPress: doCancel },
-    ]);
+    confirmAction({
+      title: 'Cancel this order?',
+      message: 'This cannot be undone.',
+      cancelText: 'Keep order',
+      confirmText: 'Cancel order',
+      destructive: true,
+      onConfirm: doCancel,
+    });
   };
 
   if (loading) {

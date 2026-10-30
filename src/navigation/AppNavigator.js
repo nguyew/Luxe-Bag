@@ -21,6 +21,8 @@ import AdminCustomerDetailScreen from '../screens/AdminCustomerDetailScreen';
 import AdminReviewsScreen from '../screens/AdminReviewsScreen';
 import AdminPromotionsScreen from '../screens/AdminPromotionsScreen';
 import AdminCouponFormScreen from '../screens/AdminCouponFormScreen';
+import AdminCampaignsScreen from '../screens/AdminCampaignsScreen';
+import AdminCampaignFormScreen from '../screens/AdminCampaignFormScreen';
 import AdminReportsScreen from '../screens/AdminReportsScreen';
 import AdminTaxonomyScreen from '../screens/AdminTaxonomyScreen';
 import ReviewFormScreen from '../screens/ReviewFormScreen';
@@ -244,6 +246,19 @@ export default function AppNavigator() {
             component={AdminCouponFormScreen}
             options={({ route }) => ({
               title: route.params?.couponId ? 'Edit Code' : 'New Code',
+              ...detailHeader,
+            })}
+          />
+          <Stack.Screen
+            name="AdminCampaigns"
+            component={AdminCampaignsScreen}
+            options={{ title: 'Promotions', ...detailHeader }}
+          />
+          <Stack.Screen
+            name="AdminCampaignForm"
+            component={AdminCampaignFormScreen}
+            options={({ route }) => ({
+              title: route.params?.campaignId ? 'Edit Promotion' : 'New Promotion',
               ...detailHeader,
             })}
           />
