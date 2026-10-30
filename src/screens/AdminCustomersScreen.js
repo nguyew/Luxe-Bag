@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   StatusBar,
@@ -121,7 +122,17 @@ const CustomerRow = React.memo(function CustomerRow({ user, onPress }) {
       accessibilityLabel={`${user.name}, ${disabled ? 'disabled' : 'active'}`}
     >
       <View style={[styles.avatar, disabled && styles.avatarOff]}>
-        <Text style={styles.avatarText}>{(user.name || '?').charAt(0).toUpperCase()}</Text>
+        {typeof user.avatarUrl === 'string' && user.avatarUrl.trim() !== '' ? (
+          <Image
+            source={{ uri: user.avatarUrl.trim() }}
+            style={styles.avatarImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={styles.avatarText}>
+            {(user.name || '?').charAt(0).toUpperCase()}
+          </Text>
+        )}
       </View>
       <View style={styles.body}>
         <View style={styles.nameRow}>
@@ -180,7 +191,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarOff: { backgroundColor: '#B9B2AA' },
-  avatarText: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
+
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 23,
+  },
+
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
   body: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
