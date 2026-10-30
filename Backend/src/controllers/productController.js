@@ -49,10 +49,6 @@ const fields = [
   'imageKey',
 ];
 
-// ==========================================
-// VALIDATION
-// ==========================================
-
 const validate = (body, partial = false) => {
   const errors = [];
 
@@ -178,10 +174,6 @@ const validate = (body, partial = false) => {
   return errors;
 };
 
-// ==========================================
-// HELPER FUNCTIONS
-// ==========================================
-
 const pick = (body) =>
   Object.fromEntries(
     fields
@@ -276,10 +268,6 @@ const sendNotFound = (res, id) =>
         : 'Invalid product id.',
     });
 
-// ==========================================
-// ATTACH FEEDBACKS
-// ==========================================
-
 const attachFeedbacks = async (
   products,
   includeHidden = false
@@ -341,10 +329,6 @@ const attachFeedbacks = async (
   }));
 };
 
-// ==========================================
-// ATTACH PROMOTIONS
-// ==========================================
-
 const attachPromotions = async (products) => {
   const promotions = await getActivePromotions();
 
@@ -355,10 +339,6 @@ const attachPromotions = async (products) => {
     )
   );
 };
-
-// ==========================================
-// GET ALL PRODUCTS
-// ==========================================
 
 const listProducts = async (req, res) => {
   const isAdmin = req.user?.role === 'admin';
@@ -430,10 +410,6 @@ const listProducts = async (req, res) => {
   });
 };
 
-// ==========================================
-// GET PRODUCT BY ID
-// ==========================================
-
 const getProduct = async (req, res) => {
   const product = await (
     mongoose.isValidObjectId(req.params.id)
@@ -469,10 +445,6 @@ const getProduct = async (req, res) => {
     product: result,
   });
 };
-
-// ==========================================
-// CREATE PRODUCT
-// ==========================================
 
 const createProduct = async (req, res) => {
   const body = req.body || {};
@@ -540,10 +512,6 @@ const createProduct = async (req, res) => {
     product,
   });
 };
-
-// ==========================================
-// UPDATE PRODUCT
-// ==========================================
 
 const updateProduct = async (req, res) => {
   const body = req.body || {};
@@ -699,10 +667,6 @@ const updateProduct = async (req, res) => {
   });
 };
 
-// ==========================================
-// DELETE PRODUCT
-// ==========================================
-
 const deleteProduct = async (req, res) => {
   const product = await findById(
     req.params.id
@@ -736,10 +700,6 @@ const deleteProduct = async (req, res) => {
   return res.status(204).send();
 };
 
-// ==========================================
-// CREATE IMAGE UPLOAD URL
-// ==========================================
-
 const createImageUpload = async (req, res) => {
   const {
     contentType,
@@ -758,11 +718,6 @@ const createImageUpload = async (req, res) => {
 
   return res.json(result);
 };
-
-// ==========================================
-// UPLOAD IMAGE PROXY
-// ==========================================
-
 const uploadImageProxy = async (req, res) => {
   const contentType =
     req.headers['content-type'];
@@ -798,10 +753,6 @@ const uploadImageProxy = async (req, res) => {
     uri,
   });
 };
-
-// ==========================================
-// EXPORT CONTROLLERS
-// ==========================================
 
 module.exports = {
   createImageUpload,
