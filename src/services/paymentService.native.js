@@ -8,8 +8,6 @@
  * Đơn chỉ được coi là "paid" khi webhook Stripe của Backend xác nhận; app luôn tải lại
  * GET /api/orders/{id} để lấy trạng thái thật.
  */
-import { Platform } from 'react-native';
-
 // Publishable key (pk_test_... / pk_live_...) – khóa công khai, an toàn để nằm trong app.
 const PUBLISHABLE_KEY = (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim();
 const MERCHANT_NAME = 'LuxeBag';
@@ -40,11 +38,8 @@ export function describePaymentError(error) {
 
 let initialized = false;
 
-// Nạp module native khi thật sự cần, để app vẫn chạy trên web / bản không có Stripe.
+// Nạp module native khi thật sự cần, để bản không có Stripe vẫn khởi động được.
 function loadStripe() {
-  if (Platform.OS === 'web') {
-    throw new PaymentError('unsupported');
-  }
   try {
     return require('@stripe/stripe-react-native');
   } catch {

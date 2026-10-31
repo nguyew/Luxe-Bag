@@ -11,7 +11,7 @@
  */
 import { backendApi, BACKEND_URL } from './api';
 import { getAuthToken } from './authToken';
-import { File } from 'expo-file-system';
+import { Platform } from 'react-native';
 import { removeHandbag, upsertHandbag } from './handbagStore';
 import { OrderError } from './orderService';
 import { toPublicUser } from './userService';
@@ -24,17 +24,32 @@ const customerPath = (id) => `api/admin/customers/${encodeURIComponent(id)}`;
 const customerDisablePath = (id) => `${customerPath(id)}/disable`;
 const customerEnablePath = (id) => `${customerPath(id)}/enable`;
 
-export async function uploadProductImage(uri, contentType) {
+export async function uploadProductImage(uri, contentType, browserFile) {
   if (!BACKEND_URL) {
     throw new Error('Missing EXPO_PUBLIC_BACKEND_URL. Add it to your .env file and restart Expo.');
   }
-  const file = new File(uri);
-  const declaredType = String(contentType || file.type || '').toLowerCase();
+  let sourceType = '';
+  let image;
+  if (Platform.OS === 'web') {
+    const source = browserFile && typeof browserFile.arrayBuffer === 'function'
+      ? browserFile
+      : await fetch(uri).then((response) => {
+        if (!response.ok) throw new Error('Could not read the selected image.');
+        return response.blob();
+      });
+    sourceType = source.type;
+    image = await source.arrayBuffer();
+  } else {
+    const { File } = await import('expo-file-system');
+    const file = new File(uri);
+    sourceType = file.type;
+    image = await file.arrayBuffer();
+  }
+  const declaredType = String(contentType || sourceType || '').toLowerCase();
   const normalizedType = declaredType === 'image/jpg' ? 'image/jpeg' : declaredType;
   const supportedType = ['image/jpeg', 'image/png', 'image/webp'].includes(normalizedType)
     ? normalizedType
     : 'image/jpeg';
-  const image = await file.arrayBuffer();
   const token = await getAuthToken();
   const response = await fetch(
     `${BACKEND_URL}/api/admin/products/image-upload/proxy`,

@@ -108,7 +108,7 @@ export default function AdminProductFormScreen({ navigation, route }) {
     const contentType = asset.mimeType || 'image/jpeg';
     setImageBusy(true);
     try {
-      const uploaded = await uploadProductImage(asset.uri, contentType);
+      const uploaded = await uploadProductImage(asset.uri, contentType, asset.file);
       setUri(uploaded.uri);
       setImageKey(uploaded.imageKey);
     } catch {

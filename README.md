@@ -118,6 +118,18 @@ For card payments, the app also needs
 and restart the backend after changing environment variables. Never use real
 card numbers with Stripe test keys.
 
+Android uses Stripe PaymentSheet, while web uses Stripe Elements. To test card
+payments on Android, build and launch the native app instead of Expo Go:
+
+```bash
+npx expo run:android
+```
+
+After changing the Stripe key or native Stripe configuration, rebuild the
+Android app. Expo Go can still be used for cash-on-delivery and other flows,
+but it cannot present the native Stripe PaymentSheet. Web card payments run
+through Stripe Elements in the browser.
+
 More backend details: [Backend/README.md](Backend/README.md).
 
 ### 2. Expo app (repository root)
@@ -135,6 +147,7 @@ EXPO_PUBLIC_BACKEND_URL=http://YOUR_COMPUTER_LAN_IP:5000
 
 - In Expo Go, do **not** use `localhost`: it refers to the phone. Use the computer's LAN IPv4 address
   (for example `http://192.168.1.25:5000`) and keep the phone and computer on the same Wi-Fi network.
+- In the Android Studio emulator, use `http://10.0.2.2:5000` to reach a backend running on the development computer.
 - Your IP changes when you switch networks, so update this value (and restart Expo) when the app cannot connect.
 - On Windows, allow port `5000` through the firewall if the phone still cannot reach the backend.
 - Any variable starting with `EXPO_PUBLIC_` is bundled into the app. **Never** put the Gemini key or any other secret there.

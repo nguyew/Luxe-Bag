@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AddressCard from '../components/AddressCard';
+import CardPaymentFields from '../components/CardPaymentFields';
 import RemoteImage from '../components/RemoteImage';
 import SignInPrompt from '../components/SignInPrompt';
 import useAuth from '../hooks/useAuth';
@@ -344,10 +345,15 @@ export default function CheckoutScreen({ navigation }) {
           );
         })}
         {method === 'card' && (
-          <Text style={styles.cardNote}>
-            You’ll enter your card details securely in the next step. Your bag stays here until the
-            payment succeeds.
-          </Text>
+          <>
+            <View style={styles.cardField}>
+              <CardPaymentFields />
+            </View>
+            <Text style={styles.cardNote}>
+              Your card details are securely processed by Stripe. Your bag stays here until the
+              payment succeeds.
+            </Text>
+          </>
         )}
 
         {/* Mã giảm giá */}
@@ -715,6 +721,18 @@ const styles = StyleSheet.create({
   },
   methodOn: { borderColor: '#050505' },
   methodOff: { opacity: 0.5 },
+  cardField: {
+    minHeight: 48,
+    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#D8D2CC',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
   cardNote: { marginTop: 4, marginBottom: 4, paddingHorizontal: 6, fontSize: 12, lineHeight: 17, color: '#77716A' },
   methodText: { flex: 1 },
   methodLabel: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },

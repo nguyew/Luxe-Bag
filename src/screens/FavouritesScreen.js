@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   LayoutAnimation,
   Pressable,
@@ -16,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import FavoriteItem from '../components/FavoriteItem';
 import useFavorites from '../hooks/useFavorites';
 import useHandbags from '../hooks/useHandbags';
+import { confirmAction } from '../utils/confirm';
 
 export default function FavoritesScreen({ navigation }) {
   const { favorites, ready, removeFavorite, clearFavorites } = useFavorites();
@@ -65,21 +65,16 @@ export default function FavoritesScreen({ navigation }) {
 
   const confirmClearAll = useCallback(() => {
     const count = favorites.length;
-    Alert.alert(
-      'Clear all favorites?',
-      `This removes ${count} ${count === 1 ? 'handbag' : 'handbags'} from your favorites.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear all',
-          style: 'destructive',
-          onPress: () => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            clearFavorites();
-          },
-        },
-      ]
-    );
+    confirmAction({
+      title: 'Clear all favorites?',
+      message: `This removes ${count} ${count === 1 ? 'handbag' : 'handbags'} from your favorites.`,
+      confirmText: 'Clear all',
+      destructive: true,
+      onConfirm: () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        clearFavorites();
+      },
+    });
   }, [favorites.length, clearFavorites]);
 
   const renderItem = useCallback(
