@@ -13,10 +13,8 @@ const {
 } = require('../services/orderPaymentService');
 const { releaseOrderResources } = require('../services/orderResourceService');
 const { paymentTimeoutMinutes } = require('../config/env');
-const { getActivePromotions, round2: roundPrice, selectPromotion } = require('../services/pricingService');
+const { calcShipping, getActivePromotions, roundMoney, selectPromotion } = require('../services/pricingService');
 
-const SHIPPING_FEE = 15;
-const FREE_SHIPPING_THRESHOLD = 500;
 const MAX_PER_LINE = 10;
 const RETURN_WINDOW_DAYS = 7;
 const normalizeCouponCode = (value) => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -28,7 +26,6 @@ const RETURN_REASONS = [
   'Other',
 ];
 
-const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const matchesCouponTarget = (coupon, product) =>
   coupon.scope === 'all'
   || (coupon.scope === 'category' && coupon.targetValue === product.category)
@@ -103,7 +100,7 @@ const createOrder = async (req, res) => {
       reserved.push({ productId, qty });
       const promotionSelection = selectPromotion(activePromotions, product);
       const rawPrice = Number(product.cost);
-      const unitPrice = roundPrice(promotionSelection
+      const unitPrice = roundMoney(promotionSelection
         ? rawPrice - promotionSelection.discount
         : rawPrice);
       orderItems.push({
@@ -123,7 +120,7 @@ const createOrder = async (req, res) => {
       return res.status(409).json({ error: 'Some items are no longer available in the requested quantity.', code: 'unavailable', details: problems });
     }
 
-    const subtotal = round2(orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0));
+    const subtotal = roundMoney(orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0));
     let discount = 0;
     if (normalizedCouponCode) {
       const nowForCoupon = new Date();
@@ -147,7 +144,7 @@ const createOrder = async (req, res) => {
         reserved.length = 0;
         return res.status(400).json({ error: 'This discount code is invalid, expired, inactive, or no longer available.', code: 'invalid_coupon' });
       }
-      const eligibleSubtotal = round2(orderItems
+      const eligibleSubtotal = roundMoney(orderItems
         .filter((item) => matchesCouponTarget(redeemedCoupon, item))
         .reduce((sum, item) => sum + item.unitPrice * item.qty, 0));
       if (eligibleSubtotal < Number(redeemedCoupon.minSubtotal || 0)) {
@@ -157,13 +154,13 @@ const createOrder = async (req, res) => {
         return badRequest(res, 'This coupon minimum spend was not met for eligible products.', { code: 'coupon_minimum_spend' });
       }
       const rawDiscount = (eligibleSubtotal * redeemedCoupon.value) / 100;
-      discount = round2(Math.min(
+      discount = roundMoney(Math.min(
         Math.max(rawDiscount, 0),
         eligibleSubtotal,
         redeemedCoupon.maxDiscount == null ? Number.POSITIVE_INFINITY : redeemedCoupon.maxDiscount
       ));
     }
-    const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+    const shipping = calcShipping(roundMoney(subtotal - discount));
     const now = new Date();
     createdOrder = await Order.create({
       userId: req.user._id,
@@ -172,7 +169,7 @@ const createOrder = async (req, res) => {
       subtotal,
       discount,
       shipping,
-      total: round2(subtotal - discount + shipping),
+      total: roundMoney(subtotal - discount + shipping),
       address: {
         fullName: address.fullName.trim(),
         phone: address.phone.trim(),
@@ -248,7 +245,7 @@ const listPurchasedBags = async (req, res) => {
 
     for (const item of raw.items || []) {
       const productId = asId(item.productId) || item.handbagId;
-      const lineTotal = round2(Number(item.unitPrice) * Number(item.qty));
+      const lineTotal = roundMoney(Number(item.unitPrice) * Number(item.qty));
       const existing = grouped.get(productId);
       if (!existing) {
         grouped.set(productId, {
@@ -269,7 +266,7 @@ const listPurchasedBags = async (req, res) => {
         continue;
       }
       existing.quantity += item.qty;
-      existing.totalSpent = round2(existing.totalSpent + lineTotal);
+      existing.totalSpent = roundMoney(existing.totalSpent + lineTotal);
       if (!existing.orderIds.includes(orderId)) {
         existing.orderIds.push(orderId);
         existing.ordersCount += 1;
@@ -317,7 +314,7 @@ const listPurchasedBags = async (req, res) => {
     summary: {
       bags: bags.length,
       items: bags.reduce((sum, bag) => sum + bag.quantity, 0),
-      totalSpent: round2(bags.reduce((sum, bag) => sum + bag.totalSpent, 0)),
+      totalSpent: roundMoney(bags.reduce((sum, bag) => sum + bag.totalSpent, 0)),
     },
     bags,
   });

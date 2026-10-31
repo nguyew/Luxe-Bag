@@ -4,7 +4,10 @@
  * coupon: { id, code, type: 'percent', value, minSubtotal, maxDiscount,
  *           scope, targetValue, expiresAt (ISO | null), active, usageLimit, usedCount }
  */
-import { round2 } from './orders';
+import { formatPrice } from './format';
+import { roundMoney } from './orders';
+
+const roundPercent = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 export const normalizeCode = (code) =>
   String(code ?? '').trim().toUpperCase().replace(/\s+/g, '');
@@ -21,7 +24,7 @@ export function couponStatus(coupon, now = Date.now()) {
 export function calcCouponDiscount(coupon, subtotal) {
   if (!(subtotal > 0)) return 0;
   const raw = (subtotal * coupon.value) / 100;
-  return round2(Math.min(
+  return roundMoney(Math.min(
     Math.max(raw, 0),
     subtotal,
     coupon.maxDiscount == null ? Number.POSITIVE_INFINITY : coupon.maxDiscount
@@ -62,16 +65,16 @@ export function describeCouponError(result) {
     case 'used_up':
       return 'This code has been fully redeemed.';
     case 'min_subtotal':
-      return `Spend at least đ${result.minSubtotal}   to use this code.`;
+      return `Spend at least ${formatPrice(result.minSubtotal)} to use this code.`;
     default:
       return 'This code can’t be applied.';
   }
 }
 
-/** "20% off" / "$15 off" (+ điều kiện tối thiểu). */
+/** "20% off" / "₫50,000 off" (+ điều kiện tối thiểu). */
 export function describeCoupon(coupon) {
-  const base = coupon.type === 'percent' ? `${coupon.value}% off` : `đ${coupon.value} off`;
-  return coupon.minSubtotal > 0 ? `${base} over $${coupon.minSubtotal}` : base;
+  const base = coupon.type === 'percent' ? `${coupon.value}% off` : `${formatPrice(coupon.value)} off`;
+  return coupon.minSubtotal > 0 ? `${base} over ${formatPrice(coupon.minSubtotal)}` : base;
 }
 
 /** Làm sạch danh sách mã đọc từ API / trước khi lưu: bỏ mục sai, ép kiểu, không trùng mã. */
@@ -97,7 +100,7 @@ export function sanitizeCoupons(list) {
       id: String(item.id || `cp-${code}`),
       code,
       type,
-      value: round2(value),
+      value: roundPercent(value),
       minSubtotal: Math.max(0, Number(item.minSubtotal) || 0),
       maxDiscount: item.maxDiscount == null ? null : Math.max(0, Number(item.maxDiscount) || 0),
       scope: ['all', 'category', 'brand'].includes(item.scope) ? item.scope : 'all',

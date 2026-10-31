@@ -26,7 +26,7 @@ import { normalizeFeedbacks, summarizeFeedbacks } from '../utils/feedback';
 import { formatOriginalPrice, formatPercentOff, formatPrice, formatBrand } from '../utils/format';
 
 const SUGGESTIONS = [
-  'A work bag under $600',
+  'A work bag under ₫15,000,000',
   'Something red and elegant',
   'A gift for my mom',
   'Best rated crossbody',

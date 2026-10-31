@@ -1,7 +1,19 @@
 const Promotion = require('../models/Promotion');
 const CatalogTerm = require('../models/CatalogTerm');
 
-const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const { roundMoney } = require('../utils/money');
+
+// Whole VND. Keep in sync with src/utils/orders.js in the app.
+const SHIPPING_FEE = 30000;
+const FREE_SHIPPING_THRESHOLD = 3000000;
+
+// Free shipping is decided on the amount the customer actually pays for goods
+// (subtotal AFTER coupon discount). Keep in sync with src/utils/orders.js in the app.
+const calcShipping = (amountAfterDiscount) => {
+  const amount = Number(amountAfterDiscount);
+  if (!(amount > 0)) return 0;
+  return amount >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+};
 const matchesTarget = (offer, product) =>
   offer.scope === 'all'
   || (offer.scope === 'category' && matchesValue(offer, product.category))
@@ -46,7 +58,7 @@ function selectPromotion(promotions, product) {
     .filter((promotion) => Number.isFinite(Number(promotion.percentOff)) && matchesTarget(promotion, product))
     .map((promotion) => ({
       promotion,
-      discount: round2(Number(product.cost) * Number(promotion.percentOff)),
+      discount: roundMoney(Number(product.cost) * Number(promotion.percentOff)),
     }))
     .sort((a, b) => b.discount - a.discount || b.promotion.createdAt - a.promotion.createdAt)[0] || null;
 }
@@ -63,8 +75,8 @@ function discountedProduct(product, selection) {
   const discount = selection.discount;
   return {
     ...raw,
-    originalCost: round2(Number(product.cost)),
-    cost: round2(Math.max(0, Number(product.cost) - discount)),
+    originalCost: roundMoney(Number(product.cost)),
+    cost: roundMoney(Math.max(0, Number(product.cost) - discount)),
     percentOff: Number(selection.promotion.percentOff),
     discountMode: 'real',
     promotion: {
@@ -77,8 +89,11 @@ function discountedProduct(product, selection) {
 }
 
 module.exports = {
+  FREE_SHIPPING_THRESHOLD,
+  SHIPPING_FEE,
+  calcShipping,
   discountedProduct,
   getActivePromotions,
-  round2,
+  roundMoney,
   selectPromotion,
 };

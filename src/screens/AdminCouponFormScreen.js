@@ -25,7 +25,11 @@ const EXPIRY_CHOICES = [
   { key: '90', label: '90 days' },
 ];
 
-const toNumber = (text) => Number(String(text).trim().replace(',', '.'));
+// VND là số nguyên: chỉ giữ chữ số (bỏ dấu . , phân cách hàng nghìn).
+const toNumber = (text) => {
+  const digits = String(text).replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : NaN;
+};
 
 // Hết hạn vào cuối ngày thứ n kể từ hôm nay
 function expiryFromDays(days) {
@@ -254,7 +258,7 @@ export default function AdminCouponFormScreen({ navigation, route }) {
           onChangeText={setMaxDiscount}
           error={errors.maxDiscount}
           placeholder="Unlimited"
-          keyboardType="decimal-pad"
+          keyboardType="number-pad"
         />
         <AuthField
           ref={minRef}
@@ -263,7 +267,7 @@ export default function AdminCouponFormScreen({ navigation, route }) {
           onChangeText={setMinSubtotal}
           error={errors.minSubtotal}
           placeholder="0"
-          keyboardType="decimal-pad"
+          keyboardType="number-pad"
           returnKeyType="next"
           onSubmitEditing={() => limitRef.current?.focus()}
           blurOnSubmit={false}

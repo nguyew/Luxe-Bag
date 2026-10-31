@@ -74,22 +74,22 @@ const validate = (body, partial = false) => {
 
   if (!partial || body.cost !== undefined) {
     if (
-      !Number.isFinite(Number(body.cost)) ||
+      !Number.isSafeInteger(Number(body.cost)) ||
       Number(body.cost) <= 0
     ) {
-      errors.push('cost must be greater than 0.');
+      errors.push('cost must be a whole number of VND greater than 0.');
     }
   }
 
   if (
     body.originalCost !== undefined &&
     (
-      !Number.isFinite(Number(body.originalCost)) ||
+      !Number.isSafeInteger(Number(body.originalCost)) ||
       Number(body.originalCost) < 0
     )
   ) {
     errors.push(
-      'originalCost must be a non-negative number.'
+      'originalCost must be a non-negative whole number of VND.'
     );
   }
 

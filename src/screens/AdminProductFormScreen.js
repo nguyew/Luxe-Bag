@@ -24,7 +24,11 @@ import { formatBrand, formatCategory, knownLabel } from '../utils/format';
 const IMAGE_URL = /^https?:\/\/\S+$/i;
 const STATUS_KEYS = ['draft', 'published', 'archived'];
 
-const toNumber = (text) => Number(String(text).trim().replace(',', '.'));
+// VND là số nguyên: chỉ giữ chữ số (bỏ dấu . , phân cách hàng nghìn).
+const toNumber = (text) => {
+  const digits = String(text).replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : NaN;
+};
 
 // percentOff trong API là số thập phân (0.42) -> ô nhập hiển thị 42
 function percentText(value) {
@@ -337,7 +341,7 @@ export default function AdminProductFormScreen({ navigation, route }) {
               onChangeText={setCost}
               error={errors.cost}
               placeholder="0"
-              keyboardType="decimal-pad"
+              keyboardType="number-pad"
               returnKeyType="next"
               onSubmitEditing={() => (editing ? discountRef.current?.focus() : stockRef.current?.focus())}
               blurOnSubmit={false}

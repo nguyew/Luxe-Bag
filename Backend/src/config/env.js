@@ -58,7 +58,7 @@ module.exports = {
   paymentCleanupIntervalMinutes,
   paymentTimeoutMinutes,
   port,
-  stripeCurrency: (process.env.STRIPE_CURRENCY || "usd").toLowerCase(),
+  stripeCurrency: (process.env.STRIPE_CURRENCY || "vnd").toLowerCase(),
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
 

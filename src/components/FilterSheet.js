@@ -55,7 +55,7 @@ export default function FilterSheet({ visible, items, filters, onApply, onClose 
   const resultCount = useMemo(() => applyFilters(items, draft).length, [items, draft]);
 
   const set = (patch) => setDraft((current) => ({ ...current, ...patch }));
-  const cleanPrice = (text) => text.replace(/[^0-9.,]/g, '');
+  const cleanPrice = (text) => text.replace(/[^0-9]/g, '');
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -146,7 +146,7 @@ export default function FilterSheet({ visible, items, filters, onApply, onClose 
                 onChangeText={(text) => set({ minPrice: cleanPrice(text) })}
                 placeholder="Min"
                 placeholderTextColor="#9A948D"
-                keyboardType="decimal-pad"
+                keyboardType="number-pad"
                 style={styles.priceInput}
                 accessibilityLabel="Minimum price"
               />
@@ -156,7 +156,7 @@ export default function FilterSheet({ visible, items, filters, onApply, onClose 
                 onChangeText={(text) => set({ maxPrice: cleanPrice(text) })}
                 placeholder="Max"
                 placeholderTextColor="#9A948D"
-                keyboardType="decimal-pad"
+                keyboardType="number-pad"
                 style={styles.priceInput}
                 accessibilityLabel="Maximum price"
               />

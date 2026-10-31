@@ -2,7 +2,7 @@
  * Hàm tính toán cho khu quản trị (thuần, không gọi mạng).
  */
 import { getStock, isPublished } from './catalog';
-import { round2 } from './orders';
+import { roundMoney } from './orders';
 
 export const LOW_STOCK_THRESHOLD = 3;
 
@@ -40,7 +40,7 @@ export function customerStats(user) {
   const valid = orders.filter(isRevenueOrder);
   return {
     orderCount: orders.length,
-    totalSpent: round2(valid.reduce((sum, order) => sum + (Number(order.total) || 0), 0)),
+    totalSpent: roundMoney(valid.reduce((sum, order) => sum + (Number(order.total) || 0), 0)),
   };
 }
 
@@ -59,7 +59,7 @@ export function salesSummary(orders) {
     orderCount: orders.length,
     pending: orders.filter((order) => order.status === 'pending').length,
     returns: returnRequestCount(orders),
-    revenue: round2(valid.reduce((sum, order) => sum + (Number(order.total) || 0), 0)),
+    revenue: roundMoney(valid.reduce((sum, order) => sum + (Number(order.total) || 0), 0)),
   };
 }
 
@@ -116,7 +116,7 @@ export function buildReport(orders, { days = 30, now = Date.now() } = {}) {
     return !Number.isNaN(time) && (from === null || time >= from);
   });
   const revenueOrders = inRange.filter(isRevenueOrder);
-  const money = (list) => round2(list.reduce((sum, order) => sum + (Number(order.total) || 0), 0));
+  const money = (list) => roundMoney(list.reduce((sum, order) => sum + (Number(order.total) || 0), 0));
 
   const revenue = money(revenueOrders);
   const returnedOrders = inRange.filter((order) => order.status === 'returned');
@@ -135,7 +135,7 @@ export function buildReport(orders, { days = 30, now = Date.now() } = {}) {
         Math.floor((Date.parse(order.createdAt) - from) / (bucketDays * DAY)),
         count - 1
       );
-      if (index >= 0) series[index].value = round2(series[index].value + (Number(order.total) || 0));
+      if (index >= 0) series[index].value = roundMoney(series[index].value + (Number(order.total) || 0));
     });
   } else if (revenueOrders.length > 0) {
     const nowDate = new Date(now);
@@ -151,7 +151,7 @@ export function buildReport(orders, { days = 30, now = Date.now() } = {}) {
       const date = new Date(order.createdAt);
       const index = date.getFullYear() * 12 + date.getMonth() - startIndex;
       if (index >= 0 && index < series.length) {
-        series[index].value = round2(series[index].value + (Number(order.total) || 0));
+        series[index].value = roundMoney(series[index].value + (Number(order.total) || 0));
       }
     });
   }
@@ -172,13 +172,13 @@ export function buildReport(orders, { days = 30, now = Date.now() } = {}) {
         revenue: 0,
       };
       product.qty += qty;
-      product.revenue = round2(product.revenue + amount);
+      product.revenue = roundMoney(product.revenue + amount);
       products.set(item.handbagId, product);
 
       const brandName = item.brand || 'Other';
       const brand = brands.get(brandName) || { brand: brandName, qty: 0, revenue: 0 };
       brand.qty += qty;
-      brand.revenue = round2(brand.revenue + amount);
+      brand.revenue = roundMoney(brand.revenue + amount);
       brands.set(brandName, brand);
     });
   });
@@ -186,7 +186,7 @@ export function buildReport(orders, { days = 30, now = Date.now() } = {}) {
   return {
     revenue,
     orderCount: revenueOrders.length,
-    avgOrder: revenueOrders.length ? round2(revenue / revenueOrders.length) : 0,
+    avgOrder: revenueOrders.length ? roundMoney(revenue / revenueOrders.length) : 0,
     refunded: money(returnedOrders),
     cancelled: inRange.filter((order) => order.status === 'cancelled').length,
     returned: returnedOrders.length,

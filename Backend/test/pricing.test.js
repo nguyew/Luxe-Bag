@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { selectPromotion } = require('../src/services/pricingService');
+const { calcShipping, selectPromotion } = require('../src/services/pricingService');
+const { isWholeMoney, legacyPriceToVnd, roundMoney } = require('../src/utils/money');
 
 const promotion = (id, percentOff, createdAt, scope = 'all', targetValue = '') => ({
   _id: id,
@@ -48,4 +49,33 @@ test('category aliases remain usable when a catalog term is inactive', () => {
   ], { cost: 9999, brand: 'bag1', category: '670000000000000000000202' });
 
   assert.equal(selected.promotion._id, 'category');
+});
+
+test('free shipping is decided on the amount after the coupon discount (VND)', () => {
+  assert.equal(calcShipping(3000000), 0);
+  assert.equal(calcShipping(2999999), 30000);
+  // subtotal 3,200,000 with a 10% coupon -> 2,880,000 after discount -> shipping applies
+  assert.equal(calcShipping(3200000 - 320000), 30000);
+  assert.equal(calcShipping(0), 0);
+});
+
+test('promotion discounts are whole dong', () => {
+  const selected = selectPromotion([promotion('p', 0.15, '2026-01-01')], { cost: 1234567 });
+  assert.equal(Number.isInteger(selected.discount), true);
+  assert.equal(selected.discount, 185185);
+});
+
+test('money helpers keep amounts as whole dong', () => {
+  assert.equal(roundMoney(1234.5), 1235);
+  assert.equal(roundMoney('1000000'), 1000000);
+  assert.equal(isWholeMoney(2500000), true);
+  assert.equal(isWholeMoney(2.5), false);
+  assert.equal(isWholeMoney(-1), false);
+});
+
+test('legacy prices are converted to VND (millions, USD, or already VND)', () => {
+  assert.equal(legacyPriceToVnd(2.5), 2500000);
+  assert.equal(legacyPriceToVnd(45), 1130000);
+  assert.equal(legacyPriceToVnd(340), 8500000);
+  assert.equal(legacyPriceToVnd(8900000), 8900000);
 });

@@ -21,9 +21,10 @@ export const DEFAULT_FILTERS = {
   sort: 'price_desc',
 };
 
+// Giá VND là số nguyên: "1.500.000" hoặc "1,500,000" đều thành 1500000.
 const toPrice = (text) => {
-  const value = Number(String(text ?? '').trim().replace(',', '.'));
-  return String(text ?? '').trim() !== '' && Number.isFinite(value) ? value : null;
+  const digits = String(text ?? '').replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : null;
 };
 
 // percentOff có thể là 0.42 hoặc 42 -> quy về 0..1

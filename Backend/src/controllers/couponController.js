@@ -1,7 +1,8 @@
 const Coupon = require('../models/Coupon');
 
 const normalizeCode = (value) => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
-const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const { isWholeMoney, roundMoney } = require('../utils/money');
+const roundPercent = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const serializeCoupon = (coupon) => {
   const raw = coupon.toObject ? coupon.toObject() : coupon;
   return {
@@ -37,8 +38,8 @@ const validateCouponBody = (body = {}) => {
   if (!/^[A-Z0-9_-]{3,20}$/.test(code)) errors.push('code must contain 3-20 letters, numbers, underscores, or hyphens.');
   if (type !== 'percent') errors.push('type must be percent.');
   if (!Number.isFinite(value) || value <= 0 || (type === 'percent' && value > 100)) errors.push('value is invalid.');
-  if (!Number.isFinite(minSubtotal) || minSubtotal < 0) errors.push('minSubtotal must be zero or greater.');
-  if (maxDiscount !== null && (!Number.isFinite(maxDiscount) || maxDiscount <= 0)) errors.push('maxDiscount must be greater than zero or null.');
+  if (!isWholeMoney(minSubtotal)) errors.push('minSubtotal must be a whole number of VND (zero or greater).');
+  if (maxDiscount !== null && (!isWholeMoney(maxDiscount) || maxDiscount <= 0)) errors.push('maxDiscount must be a whole number of VND greater than zero, or null.');
   if (!['all', 'category', 'brand'].includes(scope)) errors.push('scope must be all, category, or brand.');
   if (scope !== 'all' && !targetValue) errors.push('targetValue is required for category and brand coupons.');
   if (usageLimit !== null && (!Number.isInteger(usageLimit) || usageLimit < 1)) errors.push('usageLimit must be a positive integer or null.');
@@ -48,8 +49,8 @@ const validateCouponBody = (body = {}) => {
   return {
     errors,
     data: {
-      code, type, value: round2(value), minSubtotal: round2(minSubtotal),
-      maxDiscount: maxDiscount === null ? null : round2(maxDiscount), scope, targetValue,
+      code, type, value: roundPercent(value), minSubtotal: roundMoney(minSubtotal),
+      maxDiscount: maxDiscount === null ? null : roundMoney(maxDiscount), scope, targetValue,
       usageLimit, expiresAt, active: body.active !== false,
     },
   };
@@ -129,6 +130,7 @@ module.exports = {
   listPublicCoupons,
   updateCoupon,
   normalizeCode,
-  round2,
+  roundMoney,
+  roundPercent,
   serializeCoupon,
 };

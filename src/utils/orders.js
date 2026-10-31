@@ -4,13 +4,14 @@
  * Trạng thái: pending -> confirmed -> shipping -> delivered
  *             pending -> cancelled (khách hủy được khi còn "pending")
  */
-export const SHIPPING_FEE = 15;
-export const FREE_SHIPPING_THRESHOLD = 500;
+// Tiền tệ: VND, luôn là số nguyên (không có phần thập phân).
+// Phải khớp với Backend/src/services/pricingService.js (server mới là nơi tính tiền thật).
+export const SHIPPING_FEE = 30000;
+export const FREE_SHIPPING_THRESHOLD = 3000000;
 
-export const round2 = (value) =>
-  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+export const roundMoney = (value) => Math.round(Number(value));
 
-/** Miễn phí ship từ FREE_SHIPPING_THRESHOLD USD. */
+/** Miễn phí ship từ FREE_SHIPPING_THRESHOLD (VND), tính trên tiền hàng sau giảm giá. */
 export function calcShipping(subtotal) {
   if (!(subtotal > 0)) return 0;
   return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
@@ -22,13 +23,13 @@ export function calcShipping(subtotal) {
  * Miễn phí ship tính trên tiền hàng SAU khi giảm.
  */
 export function calcTotals(lines, discount = 0) {
-  const subtotal = round2(
+  const subtotal = roundMoney(
     lines.reduce((sum, line) => sum + Number(line.unitPrice) * Number(line.qty), 0)
   );
-  const applied = round2(Math.min(Math.max(Number(discount) || 0, 0), subtotal));
-  const afterDiscount = round2(subtotal - applied);
+  const applied = roundMoney(Math.min(Math.max(Number(discount) || 0, 0), subtotal));
+  const afterDiscount = roundMoney(subtotal - applied);
   const shipping = calcShipping(afterDiscount);
-  return { subtotal, discount: applied, shipping, total: round2(afterDiscount + shipping) };
+  return { subtotal, discount: applied, shipping, total: roundMoney(afterDiscount + shipping) };
 }
 
 export const ORDER_FLOW = ['pending', 'confirmed', 'shipping', 'delivered'];
