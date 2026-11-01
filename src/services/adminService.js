@@ -9,7 +9,7 @@
  * Product, customer, order, and review administration use the authenticated
  * Backend API. Backend owns authorization and persistence for all mutations.
  */
-import { backendApi, BACKEND_URL } from './api';
+import { backendApi, BACKEND_URL, fetchAllPages } from './api';
 import { getAuthToken } from './authToken';
 import { Platform } from 'react-native';
 import { removeHandbag, upsertHandbag } from './handbagStore';
@@ -192,11 +192,7 @@ export async function createHandbag(data) {
 
 /** Load every product for the admin catalog, including drafts and archived products. */
 export async function fetchAdminProducts() {
-  const response = await backendApi.get('api/admin/products');
-  if (!Array.isArray(response?.products)) {
-    throw new Error('Unexpected response from the admin products endpoint.');
-  }
-  return response.products;
+  return fetchAllPages('api/admin/products', 'products', { limit: 500 });
 }
 
 /** Sửa sản phẩm: chỉ ghi đè các trường được truyền vào, giữ nguyên phần còn lại (feedbacks...). */

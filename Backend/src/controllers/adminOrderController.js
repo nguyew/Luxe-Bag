@@ -39,7 +39,7 @@ const listAdminOrders = async (req, res) => {
   const filter = {};
   if (typeof req.query.status === 'string' && req.query.status) filter.status = req.query.status;
   const [orders, total] = await Promise.all([
-    Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+    Order.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit),
     Order.countDocuments(filter),
   ]);
   return res.json({ orders: orders.map(serializeOrder), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });

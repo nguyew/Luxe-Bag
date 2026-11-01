@@ -56,12 +56,10 @@ function syncReviewIntoCache(productId, review) {
 export async function hasDeliveredPurchase(userId, handbagId) {
   if (!userId || !handbagId) return false;
   try {
-    const response = await backendApi.get('api/orders/my');
-    return (Array.isArray(response?.orders) ? response.orders : []).some((order) =>
-      order.status === 'delivered' &&
-      (Array.isArray(order.items) ? order.items : []).some((item) =>
-        String(item.productId || item.handbagId || item.id) === String(handbagId)
-      )
+    // One grouped request (delivered orders only) instead of downloading every order.
+    const response = await backendApi.get('api/orders/purchased');
+    return (Array.isArray(response?.bags) ? response.bags : []).some((bag) =>
+      String(bag.productId || bag.id) === String(handbagId)
     );
   } catch (error) {
     throw toReviewError(error);

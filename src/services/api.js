@@ -137,18 +137,51 @@ export const backendApi = {
   }),
 };
 
+/**
+ * Load EVERY page of a paginated list endpoint.
+ *
+ * Backend list endpoints answer `{ [key]: [...], pagination: { totalPages } }` and cap
+ * the page size, so a single request silently drops everything past the first page.
+ * Items are de-duplicated by id because a record created while we are paging can shift
+ * the pages by one. Fails loudly (never returns a partial list) if a page is invalid
+ * or the list is unreasonably long.
+ */
+export async function fetchAllPages(path, key, { limit = 100, maxPages = 50, signal } = {}) {
+  const separator = String(path).includes('?') ? '&' : '?';
+  const items = [];
+  const seen = new Set();
+  let totalPages = 1;
+
+  for (let page = 1; page <= totalPages; page += 1) {
+    if (page > maxPages) {
+      throw new Error(`Too many pages while loading ${path}.`);
+    }
+    const response = await backendApi.get(
+      `${path}${separator}page=${page}&limit=${limit}`,
+      { signal },
+    );
+    const list = response?.[key];
+    // Do not turn an unexpected response into an empty list: callers may
+    // otherwise overwrite a valid cached copy with empty data.
+    if (!Array.isArray(list)) {
+      throw new Error('Unexpected response from the server.');
+    }
+    for (const item of list) {
+      const id = item?.id ?? item?._id;
+      if (id !== undefined && id !== null) {
+        if (seen.has(String(id))) continue;
+        seen.add(String(id));
+      }
+      items.push(item);
+    }
+    totalPages = Number(response.pagination?.totalPages) || 1;
+  }
+  return items;
+}
+
 const PRODUCT_RESOURCE = 'api/products';
 
-/** Get all handbags from the Backend API. */
+/** Get all published handbags from the Backend API (every page). */
 export async function getHandbags() {
-  const response = await backendApi.get(PRODUCT_RESOURCE);
-  const products = response?.products;
-
-  // Do not turn an unexpected response into an empty product list: callers may
-  // otherwise overwrite a valid cached copy with empty data.
-  if (!Array.isArray(products)) {
-    throw new Error('Unexpected response from the server.');
-  }
-
-  return products;
+  return fetchAllPages(PRODUCT_RESOURCE, 'products', { limit: 100 });
 }

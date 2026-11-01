@@ -4,7 +4,7 @@
  * pricing, stock reservation, totals, ownership checks, and order persistence
  * are performed server-side. Stock changes are handled exclusively by Backend.
  */
-import { backendApi } from './api';
+import { backendApi, fetchAllPages } from './api';
 import {
   PAYMENT_METHODS,
   RETURN_REASONS,
@@ -125,9 +125,7 @@ export async function getOrder(orderId) {
 /** List orders belonging to the authenticated customer. */
 export async function getMyOrders(_userId) {
   try {
-    const response = await backendApi.get('api/orders/my');
-    if (!Array.isArray(response?.orders)) throw new Error('Unexpected response from the server.');
-    return sortNewestFirst(response.orders);
+    return sortNewestFirst(await fetchAllPages('api/orders/my', 'orders', { limit: 100 }));
   } catch (error) {
     throw toOrderError(error);
   }

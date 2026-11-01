@@ -31,11 +31,13 @@ function buildProductFilter(query, isAdmin = false) {
 }
 
 function productSort(value) {
+  // _id is the final tie-breaker: without a unique sort key, products that share a
+  // price or createdAt can repeat or go missing across pages.
   const options = {
-    newest: { createdAt: -1 },
-    price_asc: { cost: 1, createdAt: -1 },
-    price_desc: { cost: -1, createdAt: -1 },
-    name_asc: { handbagName: 1, createdAt: -1 },
+    newest: { createdAt: -1, _id: -1 },
+    price_asc: { cost: 1, createdAt: -1, _id: -1 },
+    price_desc: { cost: -1, createdAt: -1, _id: -1 },
+    name_asc: { handbagName: 1, createdAt: -1, _id: -1 },
   };
   return options[value] || options.newest;
 }

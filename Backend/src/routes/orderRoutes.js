@@ -42,10 +42,13 @@ router.post('/', asyncHandler(createOrder));
  * /api/orders/my:
  *   get:
  *     tags: [Orders]
- *     summary: List the authenticated customer's orders
+ *     summary: List the authenticated customer's orders (newest first, paginated)
  *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
  *     responses:
- *       200: { description: Customer orders }
+ *       200: { description: "Customer orders and a pagination object { page, limit, total, totalPages }" }
  */
 router.get('/my', asyncHandler(listMyOrders));
 

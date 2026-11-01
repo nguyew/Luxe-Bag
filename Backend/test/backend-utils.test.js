@@ -39,7 +39,7 @@ test('product query escapes regex and builds public filters', () => {
   assert.equal(filter.gender, true);
   assert.deepEqual(filter.cost, { $gte: 10, $lte: 20 });
   assert.deepEqual(filter.stock, { $gt: 0 });
-  assert.deepEqual(productSort('price_desc'), { cost: -1, createdAt: -1 });
+  assert.deepEqual(productSort('price_desc'), { cost: -1, createdAt: -1, _id: -1 });
 });
 
 test('manual and legacy payments can be refunded without calling Stripe', async () => {
@@ -65,4 +65,11 @@ test('syncLegacyPrimary selects one primary image and mirrors legacy fields', ()
   assert.equal(product.uri, 'https://example.com/1.jpg');
   assert.equal(product.imageKey, 'products/1.jpg');
   assert.equal(product.images.filter((image) => image.isPrimary).length, 1);
+});
+
+test('every product sort ends with _id so pagination is stable', () => {
+  for (const key of ['newest', 'price_asc', 'price_desc', 'name_asc', 'unknown']) {
+    const keys = Object.keys(productSort(key));
+    assert.equal(keys[keys.length - 1], '_id', `${key} must end with _id`);
+  }
 });

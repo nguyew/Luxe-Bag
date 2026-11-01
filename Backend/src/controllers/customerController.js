@@ -73,7 +73,7 @@ const listCustomers = async (req, res) => {
   }
 
   const [customers, total] = await Promise.all([
-    User.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+    User.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit),
     User.countDocuments(filter),
   ]);
 

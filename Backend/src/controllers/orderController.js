@@ -221,8 +221,18 @@ const createOrder = async (req, res) => {
 };
 
 const listMyOrders = async (req, res) => {
-  const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 });
-  return res.json({ orders: orders.map(serializeOrder) });
+  const page = Math.max(Number.parseInt(req.query.page || '1', 10) || 1, 1);
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit || '50', 10) || 50, 1), 100);
+  const filter = { userId: req.user._id };
+  const [orders, total] = await Promise.all([
+    // _id breaks ties so orders created in the same millisecond never repeat or vanish between pages.
+    Order.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit),
+    Order.countDocuments(filter),
+  ]);
+  return res.json({
+    orders: orders.map(serializeOrder),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  });
 };
 
 const toIso = (value) => (value instanceof Date ? value.toISOString() : value);
