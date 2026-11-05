@@ -9,8 +9,9 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
-    },
+    },   
     "android": {
+      "package": "com.luxebag.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -44,6 +45,11 @@
           "enableGooglePay": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d3ffb1f1-c22f-4e4b-a084-c31beda72a72"
+      }
+    }
   }
 }
