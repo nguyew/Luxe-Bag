@@ -1,3 +1,10 @@
+const {
+  connectDatabase,
+} = require('./config/db');
+
+const {
+  mongoUri,
+} = require('./config/env');
 const cors = require('cors');
 const express = require('express');
 const helmet = require('helmet');
@@ -36,6 +43,14 @@ app.use(cors({
     return callback(error);
   },
 }));
+app.use(async (req, res, next) => {
+  try {
+    await connectDatabase(mongoUri);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Stripe requires the exact raw request body to verify the webhook signature.
 // This endpoint must stay before express.json().
