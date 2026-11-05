@@ -5,13 +5,13 @@ import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
  * Hàng chip lọc cuộn ngang.
  * options: [{ key, label, count? }]  –  value: key đang chọn  –  onChange(key)
  */
-export default function FilterChips({ options, value, onChange }) {
+export default function FilterChips({ options, value, onChange, style }) {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
-      style={styles.scroll}
+      style={[styles.scroll, style]}
     >
       {options.map((option) => {
         const on = option.key === value;
@@ -35,7 +35,7 @@ export default function FilterChips({ options, value, onChange }) {
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0 },
+  scroll: { flexGrow: 0, height: 46 },
   row: { paddingHorizontal: 20, gap: 8, paddingBottom: 12 },
   chip: {
     paddingHorizontal: 14,

@@ -110,7 +110,12 @@ export default function AdminOrdersScreen({ navigation, route }) {
         subtitle={`${counts.pending || 0} waiting for confirmation`}
       />
       <SearchBox value={query} onChangeText={setQuery} placeholder="Search order ID or customer" />
-      <FilterChips options={options} value={filter} onChange={setFilter} />
+      <FilterChips
+        options={options}
+        value={filter}
+        onChange={setFilter}
+        style={styles.orderFilters}
+      />
 
       <FlatList
         data={data}
@@ -180,6 +185,7 @@ const styles = StyleSheet.create({
   },
   returnTagText: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   safeArea: { flex: 1, backgroundColor: '#F3F1F1' },
+  orderFilters: { height: 100 },
   list: { paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 },
   center: { alignItems: 'center', justifyContent: 'center', paddingVertical: 56 },
   emptyTitle: { marginTop: 12, fontSize: 17, fontWeight: '800', color: '#0D0D0D' },
